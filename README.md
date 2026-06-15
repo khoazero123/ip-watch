@@ -6,7 +6,7 @@ Monitor IPv4/IPv6 address changes on Windows, Linux, and macOS, and send webhook
 
 ### Linux / macOS
 
-**Interactive** (prompts for webhook URL):
+**One-liner** (interactive — prompts for webhook URL):
 
 ```bash
 sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh)"
@@ -19,7 +19,7 @@ sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watc
   --webhook-url "https://example.com/webhook/xxxxxxxx"
 ```
 
-> **Note:** `curl | sudo bash` pipes the script into stdin and cannot prompt for input. Use `sudo bash -c "$(curl ...)"` (same pattern as [Proxmox helper scripts](https://github.com/community-scripts/ProxmoxVE)) for interactive one-liner installs, or pass `--webhook-url` / env var for non-interactive runs.
+> **Note:** Do **not** use `curl | sudo bash` — that pipes the script into stdin and breaks interactive prompts. Use `sudo bash -c "$(curl ...)"` (same pattern as [Proxmox helper scripts](https://github.com/community-scripts/ProxmoxVE)), or pass `--webhook-url` / `IPWATCH_WEBHOOK` for non-interactive installs.
 
 ### Windows
 

@@ -8,7 +8,8 @@ CONFIG_FILE="${IPWATCH_CONFIG:-/etc/ip-watch/config.env}"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
     echo "[ERROR] Config not found: $CONFIG_FILE" >&2
-    echo "        Run install-ip-watch.sh to install." >&2
+    echo "        Install with:" >&2
+    echo '        sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh)"' >&2
     exit 1
 fi
 

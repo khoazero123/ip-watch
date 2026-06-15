@@ -10,6 +10,7 @@
 set -euo pipefail
 
 REPO_RAW="https://raw.githubusercontent.com/khoazero123/ip-watch/master"
+INSTALL_ONE_LINER='sudo bash -c "$(curl -fsSL '"$REPO_RAW"'/install-ip-watch.sh)"'
 WEBHOOK_URL=""
 IFACES=""
 POLL_INTERVAL=10
@@ -23,7 +24,10 @@ usage() {
 Install ip-watch — monitor IP changes and send webhook notifications
 
 Usage:
-  sudo $0 [--webhook-url URL] [options]
+  $INSTALL_ONE_LINER
+
+With options (append after _):
+  sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)" _ --webhook-url URL [options]
 
 Options:
   --webhook-url URL    n8n webhook URL (prompts interactively if omitted)
@@ -32,9 +36,9 @@ Options:
   --help               Show this help message
 
 Examples:
-  sudo $0
-  sudo $0 --webhook-url "https://example.com/webhook/xxx"
-  sudo $0 --webhook-url "https://..." --ifaces "eth0 wlan0"
+  $INSTALL_ONE_LINER
+  sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)" _ --webhook-url "https://example.com/webhook/xxx"
+  sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)" _ --webhook-url "https://..." --ifaces "eth0 wlan0"
 EOF
 }
 
@@ -112,14 +116,14 @@ pipe_install_hint() {
 Use one of these instead:
 
   # Interactive one-liner (stdin stays on TTY):
-  sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)"
+  $INSTALL_ONE_LINER
 
   # Non-interactive:
   sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)" _ \\
     --webhook-url 'https://example.com/webhook/xxx'
 
-  IPWATCH_WEBHOOK='https://example.com/webhook/xxx' \\
-    sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)"
+  sudo IPWATCH_WEBHOOK='https://example.com/webhook/xxx' \\
+    bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)"
 EOF
 }
 
