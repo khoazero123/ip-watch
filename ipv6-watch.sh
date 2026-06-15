@@ -56,8 +56,18 @@ get_ipv6() {
     local iface="$1"
     case "$PLATFORM" in
         linux)
+            # Prefer active global IPv6; skip link-local (fe80), temporary, and deprecated.
+            # Note: "mngtmpaddr" is a host flag, NOT a temporary address — do not filter it.
             ip -6 addr show dev "$iface" scope global 2>/dev/null \
-                | awk '/inet6/ && !/ temporary / && !/ mngtmpaddr / {print $2; exit}'
+                | awk '
+                    /inet6/ {
+                        if ($0 ~ / fe80:/) next
+                        if ($0 ~ / temporary /) next
+                        if ($0 ~ / deprecated /) next
+                        sub(/\/.*$/, "", $2)
+                        print $2
+                        exit
+                    }'
             ;;
         darwin)
             ifconfig "$iface" 2>/dev/null \
