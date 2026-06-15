@@ -157,22 +157,33 @@ $configPath = Join-Path $InstallDir "config.json"
 Write-Step "Writing config -> $configPath"
 $config | ConvertTo-Json -Depth 3 | Set-Content -Path $configPath -Encoding UTF8
 
+Write-Step "Registering Scheduled Task: $TaskName"
+$existingTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+if ($existingTask) {
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+}
+
 $taskCommand = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$TargetScript`""
 
-Write-Step "Registering Scheduled Task: $TaskName"
-schtasks /Delete /TN $TaskName /F 2>$null | Out-Null
-$schResult = schtasks /Create `
-    /TN $TaskName `
-    /SC ONEVENT `
-    /EC $EventLogName `
-    /MO $EventQuery `
-    /RU SYSTEM `
-    /RL HIGHEST `
-    /TR $taskCommand `
-    /F 2>&1
+$prevErrorAction = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+try {
+    $schResult = & schtasks.exe /Create `
+        /TN $TaskName `
+        /SC ONEVENT `
+        /EC $EventLogName `
+        /MO $EventQuery `
+        /RU SYSTEM `
+        /RL HIGHEST `
+        /TR $taskCommand `
+        /F 2>&1 | Out-String
+}
+finally {
+    $ErrorActionPreference = $prevErrorAction
+}
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Failed to register scheduled task: $schResult"
+    Write-Error "Failed to register scheduled task: $($schResult.Trim())"
     exit 1
 }
 
@@ -194,5 +205,5 @@ Write-Host "View logs: Event Viewer -> Application, or Task Scheduler -> $TaskNa
 Write-Host "Run manually: powershell -File `"$TargetScript`""
 Write-Host ""
 Write-Host "Uninstall:"
-Write-Host "  schtasks /Delete /TN '$TaskName' /F"
+Write-Host "  Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false"
 Write-Host "  Remove-Item -Recurse -Force '$InstallDir'"

@@ -145,7 +145,7 @@ sudo systemctl restart remote-access-watch
 ### Windows
 
 ```powershell
-schtasks /Delete /TN "RemoteAccessWatch-RDP" /F
+Unregister-ScheduledTask -TaskName "RemoteAccessWatch-RDP" -Confirm:$false
 Remove-Item -Recurse -Force "$env:ProgramData\RemoteAccessWatch"
 ```
 
