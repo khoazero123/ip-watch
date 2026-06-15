@@ -2,21 +2,19 @@
 # install-ipv6-watch.sh — Install ipv6-watch on Linux (systemd) and macOS (launchd)
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install-ipv6-watch.sh | sudo bash -s -- \
-#     --webhook-url "https://n8n.example.com/webhook/xxx"
-#
-#   Or clone the repo and run:
-#   sudo ./install-ipv6-watch.sh --webhook-url "https://..."
+#   curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | \
+#     sudo bash -s -- --webhook-url "https://n8n.example.com/webhook/xxx"
 
 set -euo pipefail
 
+REPO_RAW="https://raw.githubusercontent.com/khoazero123/ip-watch/master"
 WEBHOOK_URL=""
 IFACES=""
 POLL_INTERVAL=10
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/etc/ipv6-watch"
 SERVICE_NAME="ipv6-watch"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
 
 usage() {
     cat <<EOF
@@ -86,13 +84,17 @@ else
 fi
 
 SOURCE_SCRIPT="$SCRIPT_DIR/ipv6-watch.sh"
-[[ -f "$SOURCE_SCRIPT" ]] || die "ipv6-watch.sh not found in the same directory as the installer."
-
-PLATFORM="$(uname -s)"
 TARGET_SCRIPT="$INSTALL_DIR/ipv6-watch.sh"
+PLATFORM="$(uname -s)"
 
-log "Copying script -> $TARGET_SCRIPT"
-install -m 755 "$SOURCE_SCRIPT" "$TARGET_SCRIPT"
+if [[ -n "$SCRIPT_DIR" && -f "$SOURCE_SCRIPT" ]]; then
+    log "Copying script -> $TARGET_SCRIPT"
+    install -m 755 "$SOURCE_SCRIPT" "$TARGET_SCRIPT"
+else
+    log "Downloading ipv6-watch.sh from GitHub -> $TARGET_SCRIPT"
+    curl -fsSL "$REPO_RAW/ipv6-watch.sh" -o "$TARGET_SCRIPT"
+    chmod 755 "$TARGET_SCRIPT"
+fi
 
 log "Writing config -> $CONFIG_DIR/config.env"
 mkdir -p "$CONFIG_DIR"

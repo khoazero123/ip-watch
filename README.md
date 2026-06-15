@@ -2,7 +2,56 @@
 
 Monitor IPv4/IPv6 address changes on Windows, Linux, and macOS, and send webhook notifications to n8n (or any HTTP endpoint).
 
-Supports IPv6-only machines, auto-detects network adapters, and uses a unified JSON payload across all platforms.
+**Repository:** [github.com/khoazero123/ip-watch](https://github.com/khoazero123/ip-watch)
+
+## Install
+
+### Linux / macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | \
+  sudo bash -s -- --webhook-url "https://n8n.example.com/webhook/xxxxxxxx"
+```
+
+Interactive (prompts for webhook URL):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | sudo bash -s
+```
+
+### Windows
+
+Open **PowerShell** and run:
+
+```powershell
+irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | iex
+```
+
+If GitHub is blocked (ISP/DNS), use DNS-over-HTTPS:
+
+```powershell
+iex (curl.exe -s --doh-url https://1.1.1.1/dns-query https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | Out-String)
+```
+
+The script will request **Administrator** privileges and prompt for your webhook URL.
+
+**Pass webhook URL via environment variable (skip prompt):**
+
+```powershell
+$env:IPWATCH_WEBHOOK="https://n8n.example.com/webhook/xxxxxxxx"; irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | iex
+```
+
+> The `irm` command downloads the script; `iex` executes it. Always verify the URL points to [github.com/khoazero123/ip-watch](https://github.com/khoazero123/ip-watch).
+
+### After install
+
+| Platform | Script | Config | Service |
+|----------|--------|--------|---------|
+| Windows | `C:\ProgramData\IPv6Watch\ipv6-watch.ps1` | `C:\ProgramData\IPv6Watch\config.json` | Task `IPv6Watch` |
+| Linux | `/usr/local/bin/ipv6-watch.sh` | `/etc/ipv6-watch/config.env` | `systemctl status ipv6-watch` |
+| macOS | `/usr/local/bin/ipv6-watch.sh` | `/etc/ipv6-watch/config.env` | `tail -f /var/log/ipv6-watch.log` |
+
+---
 
 ## Features
 
@@ -55,103 +104,6 @@ Both scripts send the same JSON structure:
 | `timestamp` | UTC ISO 8601 timestamp |
 | `interfaces` | Map of adapter name → `{ ipv6, ipv4, mac }` |
 
-## Quick Start
-
-### Windows
-
-Run **as Administrator** using one of the methods below.
-
-> **Note:** Scripts on WSL paths (`\\wsl.localhost\...`) or downloaded from the internet are blocked by PowerShell Execution Policy. Use the `.cmd` launcher or `-ExecutionPolicy Bypass`.
-
-**Option A — double-click or run the CMD launcher (recommended):**
-
-```cmd
-install-ipv6-watch.cmd
-```
-
-**Option B — PowerShell with Bypass:**
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install-ipv6-watch.ps1
-
-# Or pass the URL directly
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install-ipv6-watch.ps1 `
-  -WebhookUrl "https://n8n.example.com/webhook/xxxxxxxx"
-```
-
-**Option C — copy to a local Windows path first:**
-
-```powershell
-Copy-Item -Recurse \\wsl.localhost\Ubuntu\var\www\my-projects\network C:\ipv6-watch
-cd C:\ipv6-watch
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install-ipv6-watch.ps1
-```
-
-**Install locations:**
-
-- Script: `C:\ProgramData\IPv6Watch\ipv6-watch.ps1`
-- Config: `C:\ProgramData\IPv6Watch\config.json`
-- Task: `IPv6Watch` (runs at startup as SYSTEM)
-
-**Run manually for debugging:**
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\IPv6Watch\ipv6-watch.ps1"
-```
-
-### Linux
-
-```bash
-# Interactive
-sudo ./install-ipv6-watch.sh
-
-# Or pass the URL directly
-sudo ./install-ipv6-watch.sh --webhook-url "https://n8n.example.com/webhook/xxxxxxxx"
-
-# With specific interfaces
-sudo ./install-ipv6-watch.sh \
-  --webhook-url "https://n8n.example.com/webhook/xxxxxxxx" \
-  --ifaces "eth0 wlan0"
-```
-
-**Install locations:**
-
-- Script: `/usr/local/bin/ipv6-watch.sh`
-- Config: `/etc/ipv6-watch/config.env`
-- Service: `ipv6-watch` (systemd)
-
-```bash
-systemctl status ipv6-watch
-journalctl -u ipv6-watch -f
-```
-
-### macOS
-
-Same installer as Linux:
-
-```bash
-sudo ./install-ipv6-watch.sh --webhook-url "https://n8n.example.com/webhook/xxxxxxxx"
-```
-
-**Install locations:**
-
-- Script: `/usr/local/bin/ipv6-watch.sh`
-- Config: `/etc/ipv6-watch/config.env`
-- Daemon: `net.ipv6watch` (launchd)
-
-```bash
-tail -f /var/log/ipv6-watch.log
-```
-
-### One-liner from GitHub
-
-Replace `USER/REPO` with your repository path:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/USER/REPO/main/install-ipv6-watch.sh | \
-  sudo bash -s -- --webhook-url "https://n8n.example.com/webhook/xxxxxxxx"
-```
-
 ## Configuration
 
 ### Windows (`config.json`)
@@ -188,6 +140,12 @@ sudo systemctl restart ipv6-watch
 Restart-ScheduledTask -TaskName "IPv6Watch"
 ```
 
+**Run manually for debugging (Windows):**
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\IPv6Watch\ipv6-watch.ps1"
+```
+
 ## Uninstall
 
 ### Windows
@@ -220,17 +178,17 @@ sudo rm -rf /etc/ipv6-watch /var/log/ipv6-watch.log /var/log/ipv6-watch.err
 
 ### Execution Policy / script not signed (Windows)
 
-```
-File ... cannot be loaded. The file ... is not digitally signed.
-```
-
-PowerShell blocks unsigned scripts by default. Fix:
+If `irm | iex` is blocked, use the CMD launcher or Bypass:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install-ipv6-watch.ps1
+irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.cmd -OutFile $env:TEMP\install.cmd; & $env:TEMP\install.cmd
 ```
 
-Or use `install-ipv6-watch.cmd` which applies Bypass automatically and requests Admin.
+Or:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | iex"
+```
 
 ### No IP detected (Windows, IPv6-only)
 

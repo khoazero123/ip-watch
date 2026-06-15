@@ -1,21 +1,16 @@
-#Requires -RunAsAdministrator
 #Requires -Version 5.1
 <#
 .SYNOPSIS
     Install ipv6-watch on Windows (Scheduled Task at startup).
 
 .PARAMETER WebhookUrl
-    n8n webhook URL. If omitted, the script prompts interactively.
-
-.PARAMETER Interfaces
-    Adapter names to monitor. Empty = auto-detect all Up adapters.
+    n8n webhook URL. If omitted, prompts interactively (or reads $env:IPWATCH_WEBHOOK).
 
 .EXAMPLE
-    .\install-ipv6-watch.ps1
-    # Prompts for Webhook URL interactively
+    irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | iex
 
 .EXAMPLE
-    .\install-ipv6-watch.ps1 -WebhookUrl "https://n8n.example.com/webhook/xxx"
+    $env:IPWATCH_WEBHOOK="https://n8n.example.com/webhook/xxx"; irm ... | iex
 #>
 
 [CmdletBinding()]
@@ -38,13 +33,41 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$RepoRawBase = 'https://raw.githubusercontent.com/khoazero123/ip-watch/master'
+
+function Test-IsAdmin {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Request-AdminElevation {
+    Write-Host "Requesting Administrator privileges..." -ForegroundColor Yellow
+
+    $tempScript = Join-Path $env:TEMP "install-ipv6-watch.ps1"
+    Invoke-WebRequest -Uri "$RepoRawBase/install-ipv6-watch.ps1" -OutFile $tempScript -UseBasicParsing
+
+    $psArgs = @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $tempScript
+    )
+    if ($WebhookUrl) {
+        $psArgs += @('-WebhookUrl', $WebhookUrl)
+    }
+    if ($PollIntervalSeconds -ne 10) {
+        $psArgs += @('-PollIntervalSeconds', $PollIntervalSeconds)
+    }
+
+    $proc = Start-Process powershell.exe -Verb RunAs -ArgumentList $psArgs -PassThru -Wait
+    exit $proc.ExitCode
+}
+
 function Write-Step([string]$Message) {
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
 function Read-WebhookUrl {
-    if ([Environment]::UserInteractive -eq $false -or $Host.Name -eq 'ServerRemoteHost') {
-        Write-Error "Webhook URL is required in non-interactive mode. Use: -WebhookUrl 'https://...'"
+    if ([Environment]::UserInteractive -eq $false) {
+        Write-Error "Webhook URL is required in non-interactive mode. Set `$env:IPWATCH_WEBHOOK or use -WebhookUrl."
         exit 1
     }
 
@@ -67,7 +90,16 @@ function Read-WebhookUrl {
     }
 }
 
-# --- Prompt for webhook if not passed via parameter ---
+# --- Self-elevate if not running as Administrator ---
+if (-not (Test-IsAdmin)) {
+    Request-AdminElevation
+}
+
+# --- Resolve webhook URL ---
+if (-not $WebhookUrl -and $env:IPWATCH_WEBHOOK) {
+    $WebhookUrl = $env:IPWATCH_WEBHOOK.Trim()
+}
+
 if (-not $WebhookUrl) {
     $WebhookUrl = Read-WebhookUrl
 }
@@ -79,22 +111,27 @@ else {
     }
 }
 
-# --- Locate source script ---
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$SourceScript = Join-Path $ScriptDir "ipv6-watch.ps1"
-
-if (-not (Test-Path $SourceScript)) {
-    Write-Error "ipv6-watch.ps1 not found in the same directory as the installer."
-    Write-Error "Download both files from GitHub or clone the repo before installing."
-    exit 1
+# --- Locate or download watch script ---
+$ScriptDir = if ($MyInvocation.MyCommand.Path) {
+    Split-Path -Parent $MyInvocation.MyCommand.Path
+} else {
+    $null
 }
+$LocalScript = if ($ScriptDir) { Join-Path $ScriptDir "ipv6-watch.ps1" } else { $null }
 
 Write-Step "Creating install directory: $InstallDir"
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
 $TargetScript = Join-Path $InstallDir "ipv6-watch.ps1"
-Write-Step "Copying script -> $TargetScript"
-Copy-Item -Path $SourceScript -Destination $TargetScript -Force
+
+if ($LocalScript -and (Test-Path $LocalScript)) {
+    Write-Step "Copying script -> $TargetScript"
+    Copy-Item -Path $LocalScript -Destination $TargetScript -Force
+}
+else {
+    Write-Step "Downloading ipv6-watch.ps1 from GitHub -> $TargetScript"
+    Invoke-WebRequest -Uri "$RepoRawBase/ipv6-watch.ps1" -OutFile $TargetScript -UseBasicParsing
+}
 
 # --- Write config ---
 $config = [ordered]@{
