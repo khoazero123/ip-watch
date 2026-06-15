@@ -28,7 +28,7 @@ send_webhook() {
     local event_type="$1"
     local username="$2"
     local source_ip="$3"
-    local ts
+    local ts response http_code curl_exit
     ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
     local payload
@@ -37,13 +37,20 @@ send_webhook() {
 EOF
 )
 
-    if curl -sf -X POST "$WEBHOOK_URL" \
+    response=$(curl -sS -X POST "$WEBHOOK_URL" \
         -H "Content-Type: application/json; charset=utf-8" \
         --max-time 15 \
-        -d "$payload" >/dev/null; then
-        log "Webhook sent: ${event_type} user=${username} ip=${source_ip}"
+        -w $'\n__HTTP_CODE__:%{http_code}' \
+        -d "$payload" 2>&1) || curl_exit=$?
+    curl_exit=${curl_exit:-0}
+
+    http_code="${response##*$'\n'__HTTP_CODE__:}"
+    response="${response%$'\n'__HTTP_CODE__:*}"
+
+    if [[ "$curl_exit" -eq 0 && "$http_code" =~ ^2[0-9]{2}$ ]]; then
+        log "Webhook sent: ${event_type} user=${username} ip=${source_ip} (HTTP ${http_code})"
     else
-        log "Webhook failed: ${event_type} user=${username} ip=${source_ip}"
+        log "Webhook failed: ${event_type} user=${username} ip=${source_ip} (curl_exit=${curl_exit} HTTP ${http_code:-n/a}) ${response:-}"
     fi
 }
 
@@ -58,7 +65,7 @@ process_line() {
         return
     fi
 
-    if [[ "$line" =~ Disconnected\ from\ user\ ([^[:space:]]+)\ ([^[:space:]]+)\ port\ [0-9]+ ]]; then
+    if [[ "$line" =~ Disconnected\ from\ user\ ([^[:space:]]+)\ ([0-9a-fA-F:.]+)\ port\ [0-9]+ ]]; then
         username="${BASH_REMATCH[1]}"
         source_ip="${BASH_REMATCH[2]}"
         send_webhook "ssh_disconnect" "$username" "$source_ip"
@@ -68,16 +75,15 @@ process_line() {
     if [[ "$line" =~ Disconnected\ from\ ([0-9a-fA-F:.]+)\ port\ [0-9]+ ]]; then
         source_ip="${BASH_REMATCH[1]}"
         send_webhook "ssh_disconnect" "" "$source_ip"
-        return
-    fi
-
-    if [[ "$line" =~ session\ closed\ for\ user\ ([^[:space:]]+) ]]; then
-        username="${BASH_REMATCH[1]}"
-        send_webhook "ssh_disconnect" "$username" ""
     fi
 }
 
 follow_sshd_journal() {
+    # The ssh unit journal often omits "Disconnected from ..." lines; sshd syslog has them all.
+    if journalctl SYSLOG_IDENTIFIER=sshd -n 1 --no-pager >/dev/null 2>&1; then
+        journalctl SYSLOG_IDENTIFIER=sshd -f -n 0 --no-pager
+        return
+    fi
     if systemctl is-active --quiet ssh 2>/dev/null; then
         journalctl -u ssh -f -n 0 --no-pager
         return
@@ -86,7 +92,7 @@ follow_sshd_journal() {
         journalctl -u sshd -f -n 0 --no-pager
         return
     fi
-    journalctl SYSLOG_IDENTIFIER=sshd -f -n 0 --no-pager
+    journalctl _COMM=sshd -f -n 0 --no-pager
 }
 
 log "Starting SSH webhook monitor (hostname=${HOSTNAME})"

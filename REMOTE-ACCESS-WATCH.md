@@ -177,7 +177,7 @@ journalctl -u remote-access-watch -f
 journalctl -u ssh -f    # hoặc -u sshd
 ```
 
-Đảm bảo `sshd` ghi log vào journal (`systemd-journald`). Script tự chọn unit `ssh`, `sshd`, hoặc `SYSLOG_IDENTIFIER=sshd`.
+Đảm bảo `sshd` ghi log vào journal (`systemd-journald`). Script theo dõi `SYSLOG_IDENTIFIER=sshd` (không chỉ `journalctl -u ssh`) vì unit `ssh` thường **không** có dòng `Disconnected from user ...`, chỉ có `session closed` (thiếu IP).
 
 ### Cài không tương tác (CI / SSH không TTY)
 
