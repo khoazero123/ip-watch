@@ -1,31 +1,31 @@
 # Remote Access Watch
 
-Theo dõi kết nối Remote Desktop trên Windows và SSH trên Linux, gửi webhook tới n8n (hoặc bất kỳ HTTP endpoint nào). Dùng **webhook URL riêng**, tách biệt với [ip-watch](README.md).
+Monitor Remote Desktop connections on Windows and SSH sessions on Linux, and send webhook notifications to n8n (or any HTTP endpoint). Uses a **separate webhook URL**, independent from [ip-watch](README.md).
 
-| Nền tảng | Sự kiện theo dõi |
+| Platform | Events monitored |
 |----------|------------------|
 | Windows  | RDP logon, logoff, disconnect, reconnect |
 | Linux    | SSH connect, disconnect |
 
 ---
 
-## Cài đặt
+## Install
 
 ### Windows (RDP)
 
-Mở **PowerShell** với quyền Administrator:
+Open **PowerShell** as Administrator:
 
 ```powershell
 irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-rdp-webhook.ps1 | iex
 ```
 
-Truyền webhook URL qua biến môi trường (bỏ qua prompt):
+Pass the webhook URL via environment variable (skip prompt):
 
 ```powershell
 $env:REMOTE_ACCESS_WEBHOOK="https://example.com/webhook/xxxxxxxx"; irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-rdp-webhook.ps1 | iex
 ```
 
-Nếu GitHub bị chặn (ISP/DNS):
+If GitHub is blocked (ISP/DNS):
 
 ```powershell
 iex (curl.exe -s --doh-url https://1.1.1.1/dns-query https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-rdp-webhook.ps1 | Out-String)
@@ -33,61 +33,60 @@ iex (curl.exe -s --doh-url https://1.1.1.1/dns-query https://raw.githubuserconte
 
 ### Linux (SSH)
 
-**Tương tác** (hỏi webhook URL — one-liner, stdin giữ trên TTY):
+**Interactive** (prompts for webhook URL — one-liner, stdin stays on TTY):
 
 ```bash
 sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh)"
 ```
 
-**Truyền webhook URL trực tiếp:**
+**With webhook URL:**
 
 ```bash
 sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh)" _ \
   --webhook-url "https://example.com/webhook/xxxxxxxx"
 ```
 
-> **Lưu ý:** `curl | sudo bash` pipe script vào stdin nên **không** prompt được. Dùng `sudo bash -c "$(curl ...)"` (giống [Proxmox helper scripts](https://github.com/community-scripts/ProxmoxVE)) để cài tương tác qua one-liner, hoặc truyền `--webhook-url` / biến `REMOTE_ACCESS_WEBHOOK`.
+> **Note:** `curl | sudo bash` pipes the script into stdin and **cannot** prompt for input. Use `sudo bash -c "$(curl ...)"` (same pattern as [Proxmox helper scripts](https://github.com/community-scripts/ProxmoxVE)) for interactive one-liner installs, or pass `--webhook-url` / the `REMOTE_ACCESS_WEBHOOK` env var.
 
 ---
 
-## Sau khi cài
+## After install
 
-| Nền tảng | Script | Config | Service |
+| Platform | Script | Config | Service |
 |----------|--------|--------|---------|
 | Windows | `C:\ProgramData\RemoteAccessWatch\RDP-Webhook.ps1` | `C:\ProgramData\RemoteAccessWatch\config.json` | Task `RemoteAccessWatch-RDP` |
 | Linux | `/usr/local/bin/ssh-webhook.sh` | `/etc/remote-access-watch/config.env` | `systemctl status remote-access-watch` |
 
-Webhook URL đã nhập khi cài được lưu tại `~/.config/remote-access-watch/install.env` (dùng lại lần cài sau).
+The webhook URL entered during install is saved at `~/.config/remote-access-watch/install.env` for reuse on future installs.
 
 ---
 
-## Sự kiện Windows (RDP)
+## Windows events (RDP)
 
-Task Scheduler lắng nghe log `Microsoft-Windows-TerminalServices-LocalSessionManager/Operational`:
+Task Scheduler listens to `Microsoft-Windows-TerminalServices-LocalSessionManager/Operational`:
 
-| Event ID | `event_type` | Mô tả |
-|----------|--------------|-------|
-| 21 | `rdp_logon` | Đăng nhập RDP |
-| 23 | `rdp_logoff` | Đăng xuất RDP |
-| 24 | `rdp_disconnect` | Ngắt kết nối RDP (session còn) |
-| 25 | `rdp_reconnect` | Kết nối lại RDP |
+| Event ID | `event_type` | Description |
+|----------|--------------|-------------|
+| 21 | `rdp_logon` | RDP logon |
+| 23 | `rdp_logoff` | RDP logoff |
+| 24 | `rdp_disconnect` | RDP disconnect (session still active) |
+| 25 | `rdp_reconnect` | RDP reconnect |
 
-## Sự kiện Linux (SSH)
+## Linux events (SSH)
 
-Script đọc journal của `sshd` và bắt các dòng:
+The script reads the `sshd` journal and matches these log lines:
 
-| Pattern log | `event_type` |
+| Log pattern | `event_type` |
 |-------------|--------------|
 | `Accepted publickey/password for user from IP` | `ssh_connect` |
 | `Disconnected from user ...` | `ssh_disconnect` |
 | `Disconnected from IP port` | `ssh_disconnect` |
-| `session closed for user ...` | `ssh_disconnect` (fallback) |
 
 ---
 
 ## Webhook Payload
 
-Cả Windows và Linux dùng cùng cấu trúc cơ bản:
+Windows and Linux share the same base structure:
 
 ```json
 {
@@ -101,21 +100,21 @@ Cả Windows và Linux dùng cùng cấu trúc cơ bản:
 }
 ```
 
-Payload Windows bổ sung thêm: `event_id`, `session_id`, `os_version`, `os_build`, `domain`, `local_adapters`.
+The Windows payload also includes: `event_id`, `session_id`, `os_version`, `os_build`, `domain`, `local_adapters`.
 
-| Trường | Mô tả |
-|--------|-------|
-| `source` | Luôn `"remote-access-watch"` — dùng để lọc trong n8n |
-| `platform` | `"windows"` hoặc `"linux"` |
+| Field | Description |
+|-------|-------------|
+| `source` | Always `"remote-access-watch"` — use to filter in n8n |
+| `platform` | `"windows"` or `"linux"` |
 | `event_type` | `rdp_logon`, `rdp_logoff`, `rdp_disconnect`, `rdp_reconnect`, `ssh_connect`, `ssh_disconnect` |
-| `hostname` | Tên máy |
-| `timestamp` | Thời điểm sự kiện (ISO 8601) |
-| `username` | Tên user đăng nhập |
-| `source_ip` | IP nguồn kết nối |
+| `hostname` | Machine hostname |
+| `timestamp` | Event time (ISO 8601) |
+| `username` | Login username |
+| `source_ip` | Source connection IP |
 
 ---
 
-## Cấu hình
+## Configuration
 
 ### Windows (`config.json`)
 
@@ -125,7 +124,7 @@ Payload Windows bổ sung thêm: `event_id`, `session_id`, `os_version`, `os_bui
 }
 ```
 
-Sửa xong không cần restart task — script đọc config mỗi lần chạy.
+No task restart needed after editing — the script reads config on each run.
 
 ### Linux (`config.env`)
 
@@ -133,7 +132,7 @@ Sửa xong không cần restart task — script đọc config mỗi lần chạy
 WEBHOOK_URL="https://example.com/webhook/xxxxxxxx"
 ```
 
-Sau khi sửa, restart service:
+After editing, restart the service:
 
 ```bash
 sudo systemctl restart remote-access-watch
@@ -141,7 +140,7 @@ sudo systemctl restart remote-access-watch
 
 ---
 
-## Gỡ cài đặt
+## Uninstall
 
 ### Windows
 
@@ -161,32 +160,34 @@ sudo systemctl daemon-reload
 
 ---
 
-## Xử lý sự cố
+## Troubleshooting
 
-### Windows: Task không chạy
+### Windows: Task not running
 
-- Kiểm tra Task Scheduler → `RemoteAccessWatch-RDP` → History
-- Chạy thủ công: `powershell -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\RemoteAccessWatch\RDP-Webhook.ps1"`
-- Đảm bảo Remote Desktop được bật và có sự kiện trong Event Viewer → Applications and Services Logs → Microsoft → Windows → TerminalServices-LocalSessionManager → Operational
+- Check Task Scheduler → `RemoteAccessWatch-RDP` → History
+- Run manually: `powershell -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\RemoteAccessWatch\RDP-Webhook.ps1"`
+- Ensure Remote Desktop is enabled and events appear in Event Viewer → Applications and Services Logs → Microsoft → Windows → TerminalServices-LocalSessionManager → Operational
 
-### Linux: Không nhận webhook
+### Linux: Webhook not received
 
 ```bash
 systemctl status remote-access-watch
 journalctl -u remote-access-watch -f
-journalctl -u ssh -f    # hoặc -u sshd
+journalctl SYSLOG_IDENTIFIER=sshd -f
 ```
 
-Đảm bảo `sshd` ghi log vào journal (`systemd-journald`). Script theo dõi `SYSLOG_IDENTIFIER=sshd` (không chỉ `journalctl -u ssh`) vì unit `ssh` thường **không** có dòng `Disconnected from user ...`, chỉ có `session closed` (thiếu IP).
+Ensure `sshd` logs to the journal (`systemd-journald`). The script follows `SYSLOG_IDENTIFIER=sshd` (not just `journalctl -u ssh`) because the `ssh` unit often **does not** include `Disconnected from user ...` lines — only `session closed` (missing source IP).
 
-### Cài không tương tác (CI / SSH không TTY)
+**n8n webhook must accept POST.** A 404 with `"This webhook is not registered for POST requests"` means the Webhook node HTTP method is set to GET — change it to POST and activate the workflow.
+
+### Non-interactive install (CI / SSH without TTY)
 
 ```bash
 sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh)" _ \
   --webhook-url "https://example.com/webhook/xxx"
 ```
 
-Hoặc dùng biến môi trường:
+Or use an environment variable:
 
 ```bash
 sudo REMOTE_ACCESS_WEBHOOK="https://example.com/webhook/xxx" \
@@ -195,15 +196,15 @@ sudo REMOTE_ACCESS_WEBHOOK="https://example.com/webhook/xxx" \
 
 ---
 
-## Tích hợp n8n
+## n8n Integration
 
-Dùng webhook riêng cho remote access. Lọc theo `source`:
+Use a dedicated webhook for remote access. Filter by `source`:
 
 ```
 {{ $json.source === "remote-access-watch" }}
 ```
 
-Phân biệt RDP và SSH:
+Distinguish RDP and SSH:
 
 ```
 {{ $json.platform === "windows" && $json.event_type === "rdp_logon" }}
@@ -214,12 +215,12 @@ Phân biệt RDP và SSH:
 
 ## Files
 
-| File | Mô tả |
-|------|-------|
-| `RDP-Webhook.ps1` | Script gửi webhook khi có sự kiện RDP (Windows) |
-| `install-rdp-webhook.ps1` | Installer Windows (Scheduled Task + Event trigger) |
-| `ssh-webhook.sh` | Script theo dõi SSH connect/disconnect (Linux) |
-| `install-ssh-webhook.sh` | Installer Linux (systemd service) |
+| File | Description |
+|------|-------------|
+| `RDP-Webhook.ps1` | Sends webhook on RDP events (Windows) |
+| `install-rdp-webhook.ps1` | Windows installer (Scheduled Task + event trigger) |
+| `ssh-webhook.sh` | Monitors SSH connect/disconnect (Linux) |
+| `install-ssh-webhook.sh` | Linux installer (systemd service) |
 
 ## License
 
