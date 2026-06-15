@@ -209,9 +209,21 @@ The script waits until at least one adapter has an IP before sending `init`. Che
 - **Linux:** `journalctl -u ipv6-watch -f`
 - **macOS:** `tail -f /var/log/ipv6-watch.log`
 
-### Non-interactive install requires URL
+### Non-interactive install (no terminal)
 
-When piping the installer (`curl | bash`), you must pass `--webhook-url` / `-WebhookUrl` — interactive prompts are not available without a TTY.
+When there is no terminal at all (CI, SSH without TTY), pass the webhook URL explicitly:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | \
+  sudo bash -s -- --webhook-url "https://n8n.example.com/webhook/xxxxxxxx"
+```
+
+Or use an environment variable:
+
+```bash
+IPWATCH_WEBHOOK="https://n8n.example.com/webhook/xxxxxxxx" \
+  curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | sudo -E bash -s
+```
 
 ## n8n Integration
 

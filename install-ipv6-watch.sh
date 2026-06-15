@@ -39,25 +39,53 @@ EOF
 log() { echo "==> $*"; }
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
+# When run via "curl | sudo bash", stdin is the pipe — read prompts from /dev/tty
+tty_print() {
+    if [[ -t 1 ]]; then
+        echo "$@"
+    elif [[ -w /dev/tty ]]; then
+        echo "$@" >/dev/tty
+    else
+        echo "$@"
+    fi
+}
+
+tty_read() {
+    local prompt="$1"
+    if [[ -t 0 ]]; then
+        read -rp "$prompt" WEBHOOK_URL
+    elif [[ -r /dev/tty ]]; then
+        read -rp "$prompt" WEBHOOK_URL </dev/tty
+    else
+        return 1
+    fi
+}
+
+can_prompt_interactively() {
+    [[ -t 0 ]] || [[ -r /dev/tty ]]
+}
+
 prompt_webhook_url() {
-    if [[ ! -t 0 ]]; then
+    if ! can_prompt_interactively; then
         die "Webhook URL is required in non-interactive mode. Use: --webhook-url 'https://...'"
     fi
 
-    echo ""
-    echo "No Webhook URL provided — please enter your n8n webhook URL."
-    echo "Example: https://n8n.example.com/webhook/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-    echo ""
+    tty_print ""
+    tty_print "No Webhook URL provided — please enter your n8n webhook URL."
+    tty_print "Example: https://n8n.example.com/webhook/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    tty_print ""
 
     while true; do
-        read -rp "Webhook URL: " WEBHOOK_URL
+        if ! tty_read "Webhook URL: "; then
+            die "Webhook URL is required in non-interactive mode. Use: --webhook-url 'https://...'"
+        fi
         WEBHOOK_URL="$(echo "$WEBHOOK_URL" | xargs)"
         if [[ -z "$WEBHOOK_URL" ]]; then
-            echo "URL cannot be empty, please try again." >&2
+            tty_print "URL cannot be empty, please try again."
             continue
         fi
         if [[ ! "$WEBHOOK_URL" =~ ^https?:// ]]; then
-            echo "URL must start with http:// or https://, please try again." >&2
+            tty_print "URL must start with http:// or https://, please try again."
             continue
         fi
         break
@@ -75,6 +103,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$(id -u)" -eq 0 ]] || die "Must be run as root (sudo)."
+
+if [[ -z "$WEBHOOK_URL" && -n "${IPWATCH_WEBHOOK:-}" ]]; then
+    WEBHOOK_URL="$IPWATCH_WEBHOOK"
+fi
 
 if [[ -z "$WEBHOOK_URL" ]]; then
     prompt_webhook_url
