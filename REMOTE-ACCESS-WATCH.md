@@ -33,22 +33,20 @@ iex (curl.exe -s --doh-url https://1.1.1.1/dns-query https://raw.githubuserconte
 
 ### Linux (SSH)
 
-**Tương tác** (hỏi webhook URL):
+**Tương tác** (hỏi webhook URL — one-liner, stdin giữ trên TTY):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh \
-  -o /tmp/install-ssh-webhook.sh && sudo bash /tmp/install-ssh-webhook.sh
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh)"
 ```
 
 **Truyền webhook URL trực tiếp:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh \
-  -o /tmp/install-ssh-webhook.sh \
-  && sudo bash /tmp/install-ssh-webhook.sh --webhook-url "https://example.com/webhook/xxxxxxxx"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh)" _ \
+  --webhook-url "https://example.com/webhook/xxxxxxxx"
 ```
 
-> **Lưu ý:** `curl | sudo bash -s` pipe script vào stdin nên không thể prompt. Dùng `curl -o && bash` để cài tương tác, hoặc truyền `--webhook-url` khi pipe.
+> **Lưu ý:** `curl | sudo bash` pipe script vào stdin nên **không** prompt được. Dùng `sudo bash -c "$(curl ...)"` (giống [Proxmox helper scripts](https://github.com/community-scripts/ProxmoxVE)) để cài tương tác qua one-liner, hoặc truyền `--webhook-url` / biến `REMOTE_ACCESS_WEBHOOK`.
 
 ---
 
@@ -184,8 +182,15 @@ journalctl -u ssh -f    # hoặc -u sshd
 ### Cài không tương tác (CI / SSH không TTY)
 
 ```bash
-REMOTE_ACCESS_WEBHOOK="https://example.com/webhook/xxx" \
-  curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh | sudo -E bash -s
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh)" _ \
+  --webhook-url "https://example.com/webhook/xxx"
+```
+
+Hoặc dùng biến môi trường:
+
+```bash
+sudo REMOTE_ACCESS_WEBHOOK="https://example.com/webhook/xxx" \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh)"
 ```
 
 ---

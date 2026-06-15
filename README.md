@@ -9,19 +9,17 @@ Monitor IPv4/IPv6 address changes on Windows, Linux, and macOS, and send webhook
 **Interactive** (prompts for webhook URL):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh \
-  -o /tmp/install-ip-watch.sh && sudo bash /tmp/install-ip-watch.sh
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh)"
 ```
 
 **With webhook URL:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh \
-  -o /tmp/install-ip-watch.sh \
-  && sudo bash /tmp/install-ip-watch.sh --webhook-url "https://example.com/webhook/xxxxxxxx"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh)" _ \
+  --webhook-url "https://example.com/webhook/xxxxxxxx"
 ```
 
-> **Note:** `curl | sudo bash -s` pipes the script into stdin and cannot prompt for input. Use `curl -o && bash` for interactive install, or pass `--webhook-url` when piping.
+> **Note:** `curl | sudo bash` pipes the script into stdin and cannot prompt for input. Use `sudo bash -c "$(curl ...)"` (same pattern as [Proxmox helper scripts](https://github.com/community-scripts/ProxmoxVE)) for interactive one-liner installs, or pass `--webhook-url` / env var for non-interactive runs.
 
 ### Windows
 
@@ -216,15 +214,15 @@ The script waits until at least one adapter has an IP before sending `init`. Che
 When there is no terminal at all (CI, SSH without TTY), pass the webhook URL explicitly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh | \
-  sudo bash -s -- --webhook-url "https://example.com/webhook/xxxxxxxx"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh)" _ \
+  --webhook-url "https://example.com/webhook/xxxxxxxx"
 ```
 
 Or use an environment variable:
 
 ```bash
-IPWATCH_WEBHOOK="https://example.com/webhook/xxxxxxxx" \
-  curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh | sudo -E bash -s
+sudo IPWATCH_WEBHOOK="https://example.com/webhook/xxxxxxxx" \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh)"
 ```
 
 ## n8n Integration

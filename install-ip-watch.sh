@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # install-ip-watch.sh — Install ip-watch on Linux (systemd) and macOS (launchd)
 #
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh \
-#     -o /tmp/install-ip-watch.sh && sudo bash /tmp/install-ip-watch.sh
+# Usage (interactive one-liner — stdin stays on TTY):
+#   sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh)"
 #
-#   curl -fsSL ... -o /tmp/install-ip-watch.sh \
-#     && sudo bash /tmp/install-ip-watch.sh --webhook-url "https://example.com/webhook/xxx"
+# Usage (with webhook URL):
+#   sudo bash -c "$(curl -fsSL .../install-ip-watch.sh)" _ --webhook-url "https://example.com/webhook/xxx"
 
 set -euo pipefail
 
@@ -75,7 +74,7 @@ save_webhook_url_to_user_config() {
     fi
 }
 
-# When run via "curl | bash", stdin is a pipe — prefer "curl -o && bash" instead.
+# When run via "curl | bash", stdin is a pipe — use: sudo bash -c "$(curl -fsSL ...)"
 tty_print() {
     if [[ -t 1 ]]; then
         echo "$@"
@@ -112,14 +111,15 @@ pipe_install_hint() {
 
 Use one of these instead:
 
-  curl -fsSL $REPO_RAW/install-ip-watch.sh -o /tmp/install-ip-watch.sh \\
-    && sudo bash /tmp/install-ip-watch.sh
+  # Interactive one-liner (stdin stays on TTY):
+  sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)"
 
-  curl -fsSL $REPO_RAW/install-ip-watch.sh | sudo bash -s -- \\
+  # Non-interactive:
+  sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)" _ \\
     --webhook-url 'https://example.com/webhook/xxx'
 
   IPWATCH_WEBHOOK='https://example.com/webhook/xxx' \\
-    curl -fsSL $REPO_RAW/install-ip-watch.sh | sudo -E bash -s
+    sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)"
 EOF
 }
 

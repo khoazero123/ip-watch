@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # install-ssh-webhook.sh — Install SSH connect/disconnect webhook monitor on Linux (systemd)
 #
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh \
-#     -o /tmp/install-ssh-webhook.sh && sudo bash /tmp/install-ssh-webhook.sh
+# Usage (interactive one-liner — stdin stays on TTY, like Proxmox helper scripts):
+#   sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ssh-webhook.sh)"
 #
-#   curl -fsSL ... -o /tmp/install-ssh-webhook.sh \
-#     && sudo bash /tmp/install-ssh-webhook.sh --webhook-url "https://example.com/webhook/xxx"
+# Usage (with webhook URL):
+#   sudo bash -c "$(curl -fsSL .../install-ssh-webhook.sh)" _ --webhook-url "https://example.com/webhook/xxx"
 
 set -euo pipefail
 
@@ -106,14 +105,15 @@ pipe_install_hint() {
 
 Use one of these instead:
 
-  curl -fsSL $REPO_RAW/install-ssh-webhook.sh -o /tmp/install-ssh-webhook.sh \\
-    && sudo bash /tmp/install-ssh-webhook.sh
+  # Interactive one-liner (stdin stays on TTY):
+  sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ssh-webhook.sh)"
 
-  curl -fsSL $REPO_RAW/install-ssh-webhook.sh | sudo bash -s -- \\
+  # Non-interactive:
+  sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ssh-webhook.sh)" _ \\
     --webhook-url 'https://example.com/webhook/xxx'
 
   REMOTE_ACCESS_WEBHOOK='https://example.com/webhook/xxx' \\
-    curl -fsSL $REPO_RAW/install-ssh-webhook.sh | sudo -E bash -s
+    sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ssh-webhook.sh)"
 EOF
 }
 
