@@ -42,6 +42,39 @@ EOF
 log() { echo "==> $*"; }
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
+get_installer_home() {
+    if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
+        getent passwd "$SUDO_USER" | cut -d: -f6
+    else
+        echo "$HOME"
+    fi
+}
+
+user_install_config() {
+    echo "$(get_installer_home)/.config/ip-watch/install.env"
+}
+
+read_saved_webhook_url() {
+    local file saved
+    file="$(user_install_config)"
+    [[ -f "$file" ]] || return 0
+    saved="$(grep -E '^\s*WEBHOOK_URL=' "$file" | head -1 | cut -d= -f2- | tr -d '"'"'"'' | xargs)"
+    [[ -n "$saved" ]] && echo "$saved"
+}
+
+save_webhook_url_to_user_config() {
+    local file dir home
+    home="$(get_installer_home)"
+    dir="$home/.config/ip-watch"
+    file="$dir/install.env"
+    mkdir -p "$dir"
+    printf 'WEBHOOK_URL="%s"\n' "$WEBHOOK_URL" > "$file"
+    chmod 600 "$file"
+    if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != "root" ]]; then
+        chown "$SUDO_USER:$SUDO_USER" "$dir" "$file" 2>/dev/null || true
+    fi
+}
+
 # When run via "curl | bash", stdin is a pipe — prefer "curl -o && bash" instead.
 tty_print() {
     if [[ -t 1 ]]; then
@@ -91,21 +124,40 @@ EOF
 }
 
 prompt_webhook_url() {
+    local default_url="${1:-}"
+
     if ! can_prompt_interactively; then
+        if [[ -n "$default_url" ]]; then
+            WEBHOOK_URL="$default_url"
+            return 0
+        fi
         pipe_install_hint
         exit 1
     fi
 
     tty_print ""
-    tty_print "No Webhook URL provided — please enter your n8n webhook URL."
+    tty_print "Enter your n8n webhook URL."
+    if [[ -n "$default_url" ]]; then
+        tty_print "Press Enter to use the saved URL."
+    fi
     tty_print "Example: https://n8n.example.com/webhook/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     tty_print ""
 
     while true; do
-        if ! tty_read "Webhook URL: "; then
-            pipe_install_hint
-            exit 1
+        if [[ -n "$default_url" ]]; then
+            if [[ -t 0 ]]; then
+                read -rp "Webhook URL [$default_url]: " WEBHOOK_URL
+            elif [[ -e /dev/tty ]]; then
+                read -rp "Webhook URL [$default_url]: " WEBHOOK_URL </dev/tty 2>/dev/null || { pipe_install_hint; exit 1; }
+            fi
+            WEBHOOK_URL="${WEBHOOK_URL:-$default_url}"
+        else
+            if ! tty_read "Webhook URL: "; then
+                pipe_install_hint
+                exit 1
+            fi
         fi
+
         WEBHOOK_URL="$(echo "$WEBHOOK_URL" | xargs)"
         if [[ -z "$WEBHOOK_URL" ]]; then
             tty_print "URL cannot be empty, please try again."
@@ -131,16 +183,21 @@ done
 
 [[ "$(id -u)" -eq 0 ]] || die "Must be run as root (sudo)."
 
+SAVED_WEBHOOK="$(read_saved_webhook_url || true)"
+
 if [[ -z "$WEBHOOK_URL" && -n "${IPWATCH_WEBHOOK:-}" ]]; then
     WEBHOOK_URL="$IPWATCH_WEBHOOK"
 fi
 
 if [[ -z "$WEBHOOK_URL" ]]; then
-    prompt_webhook_url
+    prompt_webhook_url "$SAVED_WEBHOOK"
 else
     WEBHOOK_URL="$(echo "$WEBHOOK_URL" | xargs)"
     [[ "$WEBHOOK_URL" =~ ^https?:// ]] || die "Invalid Webhook URL: $WEBHOOK_URL"
 fi
+
+save_webhook_url_to_user_config
+log "Saved webhook URL -> $(user_install_config)"
 
 SOURCE_SCRIPT="$SCRIPT_DIR/ipv6-watch.sh"
 TARGET_SCRIPT="$INSTALL_DIR/ipv6-watch.sh"
@@ -190,9 +247,10 @@ EOF
     echo ""
     echo "Installation complete (Linux/systemd)!"
     echo ""
-    echo "  Script : $TARGET_SCRIPT"
-    echo "  Config : $CONFIG_DIR/config.env"
-    echo "  Service: $SERVICE_NAME"
+    echo "  Script        : $TARGET_SCRIPT"
+    echo "  Service cfg   : $CONFIG_DIR/config.env"
+    echo "  Installer cfg : $(user_install_config)"
+    echo "  Service       : $SERVICE_NAME"
     echo ""
     echo "Status: systemctl status $SERVICE_NAME"
     echo "Logs:   journalctl -u $SERVICE_NAME -f"

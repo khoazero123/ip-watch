@@ -4,13 +4,10 @@
     Install ipv6-watch on Windows (Scheduled Task at startup).
 
 .PARAMETER WebhookUrl
-    n8n webhook URL. If omitted, prompts interactively (or reads $env:IPWATCH_WEBHOOK).
+    n8n webhook URL. If omitted, prompts interactively (prefills from ~/.config/ip-watch/install.env).
 
 .EXAMPLE
     irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | iex
-
-.EXAMPLE
-    $env:IPWATCH_WEBHOOK="https://n8n.example.com/webhook/xxx"; irm ... | iex
 #>
 
 [CmdletBinding()]
@@ -34,6 +31,25 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoRawBase = 'https://raw.githubusercontent.com/khoazero123/ip-watch/master'
+$UserConfigDir = Join-Path $env:USERPROFILE '.config\ip-watch'
+$UserConfigFile = Join-Path $UserConfigDir 'install.env'
+
+function Get-SavedWebhookUrl {
+    if (-not (Test-Path $UserConfigFile)) { return $null }
+    $line = Get-Content $UserConfigFile -ErrorAction SilentlyContinue |
+        Where-Object { $_ -match '^\s*WEBHOOK_URL=' } |
+        Select-Object -First 1
+    if ($line -match '^\s*WEBHOOK_URL="([^"]+)"') { return $Matches[1] }
+    if ($line -match "^\s*WEBHOOK_URL='([^']+)'") { return $Matches[1] }
+    if ($line -match '^\s*WEBHOOK_URL=(.+)$') { return $Matches[1].Trim() }
+    return $null
+}
+
+function Save-WebhookUrlToUserConfig {
+    param([string]$Url)
+    New-Item -ItemType Directory -Path $UserConfigDir -Force | Out-Null
+    Set-Content -Path $UserConfigFile -Value "WEBHOOK_URL=`"$Url`"" -Encoding UTF8
+}
 
 function Test-IsAdmin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -47,15 +63,9 @@ function Request-AdminElevation {
     $tempScript = Join-Path $env:TEMP "install-ipv6-watch.ps1"
     Invoke-WebRequest -Uri "$RepoRawBase/install-ipv6-watch.ps1" -OutFile $tempScript -UseBasicParsing
 
-    $psArgs = @(
-        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $tempScript
-    )
-    if ($WebhookUrl) {
-        $psArgs += @('-WebhookUrl', $WebhookUrl)
-    }
-    if ($PollIntervalSeconds -ne 10) {
-        $psArgs += @('-PollIntervalSeconds', $PollIntervalSeconds)
-    }
+    $psArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $tempScript)
+    if ($WebhookUrl) { $psArgs += @('-WebhookUrl', $WebhookUrl) }
+    if ($PollIntervalSeconds -ne 10) { $psArgs += @('-PollIntervalSeconds', $PollIntervalSeconds) }
 
     $proc = Start-Process powershell.exe -Verb RunAs -ArgumentList $psArgs -PassThru -Wait
     exit $proc.ExitCode
@@ -66,18 +76,27 @@ function Write-Step([string]$Message) {
 }
 
 function Read-WebhookUrl {
+    param([string]$DefaultUrl = '')
+
     if ([Environment]::UserInteractive -eq $false) {
+        if ($DefaultUrl) { return $DefaultUrl }
         Write-Error "Webhook URL is required in non-interactive mode. Set `$env:IPWATCH_WEBHOOK or use -WebhookUrl."
         exit 1
     }
 
     Write-Host ""
-    Write-Host "No Webhook URL provided — please enter your n8n webhook URL." -ForegroundColor Yellow
+    Write-Host "Enter your n8n webhook URL." -ForegroundColor Yellow
+    if ($DefaultUrl) {
+        Write-Host "Press Enter to use the saved URL." -ForegroundColor DarkGray
+    }
     Write-Host "Example: https://n8n.example.com/webhook/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     Write-Host ""
 
     while ($true) {
-        $url = (Read-Host "Webhook URL").Trim()
+        $prompt = if ($DefaultUrl) { "Webhook URL [$DefaultUrl]" } else { "Webhook URL" }
+        $input = Read-Host $prompt
+        $url = if ($input.Trim()) { $input.Trim() } elseif ($DefaultUrl) { $DefaultUrl } else { '' }
+
         if (-not $url) {
             Write-Host "URL cannot be empty, please try again." -ForegroundColor Yellow
             continue
@@ -95,13 +114,15 @@ if (-not (Test-IsAdmin)) {
     Request-AdminElevation
 }
 
-# --- Resolve webhook URL ---
+# --- Resolve webhook URL (param > env > prompt with saved prefill) ---
+$savedWebhook = Get-SavedWebhookUrl
+
 if (-not $WebhookUrl -and $env:IPWATCH_WEBHOOK) {
     $WebhookUrl = $env:IPWATCH_WEBHOOK.Trim()
 }
 
 if (-not $WebhookUrl) {
-    $WebhookUrl = Read-WebhookUrl
+    $WebhookUrl = Read-WebhookUrl -DefaultUrl $savedWebhook
 }
 else {
     $WebhookUrl = $WebhookUrl.Trim()
@@ -110,6 +131,9 @@ else {
         exit 1
     }
 }
+
+Save-WebhookUrlToUserConfig -Url $WebhookUrl
+Write-Step "Saved webhook URL -> $UserConfigFile"
 
 # --- Locate or download watch script ---
 $ScriptDir = if ($MyInvocation.MyCommand.Path) {
@@ -133,7 +157,7 @@ else {
     Invoke-WebRequest -Uri "$RepoRawBase/ipv6-watch.ps1" -OutFile $TargetScript -UseBasicParsing
 }
 
-# --- Write config ---
+# --- Write service config ---
 $config = [ordered]@{
     webhook_url             = $WebhookUrl
     interfaces              = @($Interfaces)
@@ -172,16 +196,16 @@ Register-ScheduledTask `
     -Principal $principal `
     -Force | Out-Null
 
-# --- Start immediately ---
 Write-Step "Starting task for the first time..."
 Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "Installation complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Script : $TargetScript"
-Write-Host "  Config : $configPath"
-Write-Host "  Task   : $TaskName (AtStartup, SYSTEM)"
+Write-Host "  Script       : $TargetScript"
+Write-Host "  Service cfg  : $configPath"
+Write-Host "  Installer cfg: $UserConfigFile"
+Write-Host "  Task         : $TaskName (AtStartup, SYSTEM)"
 Write-Host ""
 Write-Host "View logs: Task Scheduler -> $TaskName -> History"
 Write-Host "Run manually: powershell -File `"$TargetScript`""
