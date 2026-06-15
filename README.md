@@ -1,8 +1,6 @@
-# IPv6 Watch
+# IP Watch
 
 Monitor IPv4/IPv6 address changes on Windows, Linux, and macOS, and send webhook notifications to n8n (or any HTTP endpoint).
-
-**Repository:** [github.com/khoazero123/ip-watch](https://github.com/khoazero123/ip-watch)
 
 ## Install
 
@@ -11,16 +9,16 @@ Monitor IPv4/IPv6 address changes on Windows, Linux, and macOS, and send webhook
 **Interactive** (prompts for webhook URL):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh \
-  -o /tmp/install-ipv6-watch.sh && sudo bash /tmp/install-ipv6-watch.sh
+curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh \
+  -o /tmp/install-ip-watch.sh && sudo bash /tmp/install-ip-watch.sh
 ```
 
 **With webhook URL:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh \
-  -o /tmp/install-ipv6-watch.sh \
-  && sudo bash /tmp/install-ipv6-watch.sh --webhook-url "https://n8n.example.com/webhook/xxxxxxxx"
+curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh \
+  -o /tmp/install-ip-watch.sh \
+  && sudo bash /tmp/install-ip-watch.sh --webhook-url "https://example.com/webhook/xxxxxxxx"
 ```
 
 > **Note:** `curl | sudo bash -s` pipes the script into stdin and cannot prompt for input. Use `curl -o && bash` for interactive install, or pass `--webhook-url` when piping.
@@ -30,13 +28,13 @@ curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install
 Open **PowerShell** and run:
 
 ```powershell
-irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | iex
+irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.ps1 | iex
 ```
 
 If GitHub is blocked (ISP/DNS), use DNS-over-HTTPS:
 
 ```powershell
-iex (curl.exe -s --doh-url https://1.1.1.1/dns-query https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | Out-String)
+iex (curl.exe -s --doh-url https://1.1.1.1/dns-query https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.ps1 | Out-String)
 ```
 
 The script will request **Administrator** privileges and prompt for your webhook URL.
@@ -44,7 +42,7 @@ The script will request **Administrator** privileges and prompt for your webhook
 **Pass webhook URL via environment variable (skip prompt):**
 
 ```powershell
-$env:IPWATCH_WEBHOOK="https://n8n.example.com/webhook/xxxxxxxx"; irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | iex
+$env:IPWATCH_WEBHOOK="https://example.com/webhook/xxxxxxxx"; irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.ps1 | iex
 ```
 
 > The `irm` command downloads the script; `iex` executes it. Always verify the URL points to [github.com/khoazero123/ip-watch](https://github.com/khoazero123/ip-watch).
@@ -53,9 +51,9 @@ $env:IPWATCH_WEBHOOK="https://n8n.example.com/webhook/xxxxxxxx"; irm https://raw
 
 | Platform | Script | Config | Service |
 |----------|--------|--------|---------|
-| Windows | `C:\ProgramData\IPv6Watch\ipv6-watch.ps1` | `C:\ProgramData\IPv6Watch\config.json` | Task `IPv6Watch` |
-| Linux | `/usr/local/bin/ipv6-watch.sh` | `/etc/ipv6-watch/config.env` | `systemctl status ipv6-watch` |
-| macOS | `/usr/local/bin/ipv6-watch.sh` | `/etc/ipv6-watch/config.env` | `tail -f /var/log/ipv6-watch.log` |
+| Windows | `C:\ProgramData\IPWatch\ip-watch.ps1` | `C:\ProgramData\IPWatch\config.json` | Task `IPWatch` |
+| Linux | `/usr/local/bin/ip-watch.sh` | `/etc/ip-watch/config.env` | `systemctl status ip-watch` |
+| macOS | `/usr/local/bin/ip-watch.sh` | `/etc/ip-watch/config.env` | `tail -f /var/log/ip-watch.log` |
 
 ---
 
@@ -72,13 +70,11 @@ $env:IPWATCH_WEBHOOK="https://n8n.example.com/webhook/xxxxxxxx"; irm https://raw
 
 | File | Description |
 |------|-------------|
-| `ipv6-watch.ps1` | Watch script for Windows |
-| `ipv6-watch.sh` | Watch script for Linux and macOS |
-| `install-ipv6-watch.ps1` | Windows installer (Scheduled Task) |
-| `install-ipv6-watch.cmd` | Windows launcher (auto Bypass + Admin) |
-| `install-ipv6-watch.sh` | Linux/macOS installer (systemd / launchd) |
-| `RDP-Webhook.ps1` | Separate webhook for RDP session events |
-| `mikrotik.rsc` | MikroTik router configuration |
+| `ip-watch.ps1` | Watch script for Windows |
+| `ip-watch.sh` | Watch script for Linux and macOS |
+| `install-ip-watch.ps1` | Windows installer (Scheduled Task) |
+| `install-ip-watch.cmd` | Windows launcher (auto Bypass + Admin) |
+| `install-ip-watch.sh` | Linux/macOS installer (systemd / launchd) |
 
 ## Webhook Payload
 
@@ -86,7 +82,7 @@ Both scripts send the same JSON structure:
 
 ```json
 {
-  "source": "ipv6-watch",
+  "source": "ip-watch",
   "platform": "windows",
   "event_type": "init",
   "hostname": "MY-PC",
@@ -103,7 +99,7 @@ Both scripts send the same JSON structure:
 
 | Field | Description |
 |-------|-------------|
-| `source` | Always `"ipv6-watch"` — use to filter in n8n |
+| `source` | Always `"ip-watch"` — use to filter in n8n |
 | `platform` | `"windows"`, `"linux"`, or `"darwin"` |
 | `event_type` | `"init"` (startup) or `"changed"` (IP changed) |
 | `hostname` | Machine hostname |
@@ -116,7 +112,7 @@ Both scripts send the same JSON structure:
 
 ```json
 {
-  "webhook_url": "https://n8n.example.com/webhook/xxxxxxxx",
+  "webhook_url": "https://example.com/webhook/xxxxxxxx",
   "interfaces": [],
   "poll_interval_seconds": 10
 }
@@ -128,7 +124,7 @@ Both scripts send the same JSON structure:
 ### Linux / macOS (`config.env`)
 
 ```bash
-WEBHOOK_URL="https://n8n.example.com/webhook/xxxxxxxx"
+WEBHOOK_URL="https://example.com/webhook/xxxxxxxx"
 IFACES=""
 POLL_INTERVAL=10
 ```
@@ -140,16 +136,16 @@ After editing config, restart the service:
 
 ```bash
 # Linux
-sudo systemctl restart ipv6-watch
+sudo systemctl restart ip-watch
 
 # Windows
-Restart-ScheduledTask -TaskName "IPv6Watch"
+Restart-ScheduledTask -TaskName "IPWatch"
 ```
 
 **Run manually for debugging (Windows):**
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\IPv6Watch\ipv6-watch.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\IPWatch\ip-watch.ps1"
 ```
 
 ## Uninstall
@@ -157,27 +153,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\ProgramData\IPv6Watch\ip
 ### Windows
 
 ```powershell
-Stop-ScheduledTask -TaskName "IPv6Watch" -ErrorAction SilentlyContinue
-Unregister-ScheduledTask -TaskName "IPv6Watch" -Confirm:$false
-Remove-Item -Recurse -Force "$env:ProgramData\IPv6Watch"
+Stop-ScheduledTask -TaskName "IPWatch" -ErrorAction SilentlyContinue
+Unregister-ScheduledTask -TaskName "IPWatch" -Confirm:$false
+Remove-Item -Recurse -Force "$env:ProgramData\IPWatch"
 ```
 
 ### Linux
 
 ```bash
-sudo systemctl disable --now ipv6-watch
-sudo rm /etc/systemd/system/ipv6-watch.service
-sudo rm -rf /etc/ipv6-watch /usr/local/bin/ipv6-watch.sh
+sudo systemctl disable --now ip-watch
+sudo rm /etc/systemd/system/ip-watch.service
+sudo rm -rf /etc/ip-watch /usr/local/bin/ip-watch.sh
 sudo systemctl daemon-reload
 ```
 
 ### macOS
 
 ```bash
-sudo launchctl bootout system/net.ipv6watch
-sudo rm /Library/LaunchDaemons/net.ipv6watch.plist
-sudo rm /usr/local/bin/ipv6-watch.sh
-sudo rm -rf /etc/ipv6-watch /var/log/ipv6-watch.log /var/log/ipv6-watch.err
+sudo launchctl bootout system/net.ipwatch
+sudo rm /Library/LaunchDaemons/net.ipwatch.plist
+sudo rm /usr/local/bin/ip-watch.sh
+sudo rm -rf /etc/ip-watch /var/log/ip-watch.log /var/log/ip-watch.err
 ```
 
 ## Troubleshooting
@@ -187,13 +183,13 @@ sudo rm -rf /etc/ipv6-watch /var/log/ipv6-watch.log /var/log/ipv6-watch.err
 If `irm | iex` is blocked, use the CMD launcher or Bypass:
 
 ```powershell
-irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.cmd -OutFile $env:TEMP\install.cmd; & $env:TEMP\install.cmd
+irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.cmd -OutFile $env:TEMP\install.cmd; & $env:TEMP\install.cmd
 ```
 
 Or:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.ps1 | iex"
 ```
 
 ### No IP detected (Windows, IPv6-only)
@@ -211,24 +207,24 @@ Get-NetIPAddress -AddressFamily IPv6 |
 
 The script waits until at least one adapter has an IP before sending `init`. Check logs:
 
-- **Windows:** Task Scheduler → `IPv6Watch` → History, or run the script manually
-- **Linux:** `journalctl -u ipv6-watch -f`
-- **macOS:** `tail -f /var/log/ipv6-watch.log`
+- **Windows:** Task Scheduler → `IPWatch` → History, or run the script manually
+- **Linux:** `journalctl -u ip-watch -f`
+- **macOS:** `tail -f /var/log/ip-watch.log`
 
 ### Non-interactive install (no terminal)
 
 When there is no terminal at all (CI, SSH without TTY), pass the webhook URL explicitly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | \
-  sudo bash -s -- --webhook-url "https://n8n.example.com/webhook/xxxxxxxx"
+curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh | \
+  sudo bash -s -- --webhook-url "https://example.com/webhook/xxxxxxxx"
 ```
 
 Or use an environment variable:
 
 ```bash
-IPWATCH_WEBHOOK="https://n8n.example.com/webhook/xxxxxxxx" \
-  curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | sudo -E bash -s
+IPWATCH_WEBHOOK="https://example.com/webhook/xxxxxxxx" \
+  curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh | sudo -E bash -s
 ```
 
 ## n8n Integration
@@ -236,7 +232,7 @@ IPWATCH_WEBHOOK="https://n8n.example.com/webhook/xxxxxxxx" \
 Use a single webhook for both Windows and Linux/macOS clients. Filter by `source`:
 
 ```
-{{ $json.source === "ipv6-watch" }}
+{{ $json.source === "ip-watch" }}
 ```
 
 Access interface data:

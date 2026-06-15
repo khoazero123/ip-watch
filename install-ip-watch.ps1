@@ -1,13 +1,13 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Install ipv6-watch on Windows (Scheduled Task at startup).
+    Install ip-watch on Windows (Scheduled Task at startup).
 
 .PARAMETER WebhookUrl
     n8n webhook URL. If omitted, prompts interactively (prefills from ~/.config/ip-watch/install.env).
 
 .EXAMPLE
-    irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.ps1 | iex
+    irm https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.ps1 | iex
 #>
 
 [CmdletBinding()]
@@ -22,10 +22,10 @@ param(
     [int]$PollIntervalSeconds = 10,
 
     [Parameter(Mandatory = $false)]
-    [string]$InstallDir = "$env:ProgramData\IPv6Watch",
+    [string]$InstallDir = "$env:ProgramData\IPWatch",
 
     [Parameter(Mandatory = $false)]
-    [string]$TaskName = "IPv6Watch"
+    [string]$TaskName = "IPWatch"
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,8 +60,8 @@ function Test-IsAdmin {
 function Request-AdminElevation {
     Write-Host "Requesting Administrator privileges..." -ForegroundColor Yellow
 
-    $tempScript = Join-Path $env:TEMP "install-ipv6-watch.ps1"
-    Invoke-WebRequest -Uri "$RepoRawBase/install-ipv6-watch.ps1" -OutFile $tempScript -UseBasicParsing
+    $tempScript = Join-Path $env:TEMP "install-ip-watch.ps1"
+    Invoke-WebRequest -Uri "$RepoRawBase/install-ip-watch.ps1" -OutFile $tempScript -UseBasicParsing
 
     $psArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $tempScript)
     if ($WebhookUrl) { $psArgs += @('-WebhookUrl', $WebhookUrl) }
@@ -141,20 +141,20 @@ $ScriptDir = if ($MyInvocation.MyCommand.Path) {
 } else {
     $null
 }
-$LocalScript = if ($ScriptDir) { Join-Path $ScriptDir "ipv6-watch.ps1" } else { $null }
+$LocalScript = if ($ScriptDir) { Join-Path $ScriptDir "ip-watch.ps1" } else { $null }
 
 Write-Step "Creating install directory: $InstallDir"
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 
-$TargetScript = Join-Path $InstallDir "ipv6-watch.ps1"
+$TargetScript = Join-Path $InstallDir "ip-watch.ps1"
 
 if ($LocalScript -and (Test-Path $LocalScript)) {
     Write-Step "Copying script -> $TargetScript"
     Copy-Item -Path $LocalScript -Destination $TargetScript -Force
 }
 else {
-    Write-Step "Downloading ipv6-watch.ps1 from GitHub -> $TargetScript"
-    Invoke-WebRequest -Uri "$RepoRawBase/ipv6-watch.ps1" -OutFile $TargetScript -UseBasicParsing
+    Write-Step "Downloading ip-watch.ps1 from GitHub -> $TargetScript"
+    Invoke-WebRequest -Uri "$RepoRawBase/ip-watch.ps1" -OutFile $TargetScript -UseBasicParsing
 }
 
 # --- Write service config ---

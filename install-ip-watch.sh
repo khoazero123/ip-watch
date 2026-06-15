@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# install-ipv6-watch.sh — Install ipv6-watch on Linux (systemd) and macOS (launchd)
+# install-ip-watch.sh — Install ip-watch on Linux (systemd) and macOS (launchd)
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh \
-#     -o /tmp/install-ipv6-watch.sh && sudo bash /tmp/install-ipv6-watch.sh
+#   curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ip-watch.sh \
+#     -o /tmp/install-ip-watch.sh && sudo bash /tmp/install-ip-watch.sh
 #
-#   curl -fsSL ... -o /tmp/install-ipv6-watch.sh \
-#     && sudo bash /tmp/install-ipv6-watch.sh --webhook-url "https://example.com/webhook/xxx"
+#   curl -fsSL ... -o /tmp/install-ip-watch.sh \
+#     && sudo bash /tmp/install-ip-watch.sh --webhook-url "https://example.com/webhook/xxx"
 
 set -euo pipefail
 
@@ -15,13 +15,13 @@ WEBHOOK_URL=""
 IFACES=""
 POLL_INTERVAL=10
 INSTALL_DIR="/usr/local/bin"
-CONFIG_DIR="/etc/ipv6-watch"
-SERVICE_NAME="ipv6-watch"
+CONFIG_DIR="/etc/ip-watch"
+SERVICE_NAME="ip-watch"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
 
 usage() {
     cat <<EOF
-Install ipv6-watch — monitor IP changes and send webhook notifications
+Install ip-watch — monitor IP changes and send webhook notifications
 
 Usage:
   sudo $0 [--webhook-url URL] [options]
@@ -112,14 +112,14 @@ pipe_install_hint() {
 
 Use one of these instead:
 
-  curl -fsSL $REPO_RAW/install-ipv6-watch.sh -o /tmp/install-ipv6-watch.sh \\
-    && sudo bash /tmp/install-ipv6-watch.sh
+  curl -fsSL $REPO_RAW/install-ip-watch.sh -o /tmp/install-ip-watch.sh \\
+    && sudo bash /tmp/install-ip-watch.sh
 
-  curl -fsSL $REPO_RAW/install-ipv6-watch.sh | sudo bash -s -- \\
+  curl -fsSL $REPO_RAW/install-ip-watch.sh | sudo bash -s -- \\
     --webhook-url 'https://example.com/webhook/xxx'
 
   IPWATCH_WEBHOOK='https://example.com/webhook/xxx' \\
-    curl -fsSL $REPO_RAW/install-ipv6-watch.sh | sudo -E bash -s
+    curl -fsSL $REPO_RAW/install-ip-watch.sh | sudo -E bash -s
 EOF
 }
 
@@ -199,16 +199,16 @@ fi
 save_webhook_url_to_user_config
 log "Saved webhook URL -> $(user_install_config)"
 
-SOURCE_SCRIPT="$SCRIPT_DIR/ipv6-watch.sh"
-TARGET_SCRIPT="$INSTALL_DIR/ipv6-watch.sh"
+SOURCE_SCRIPT="$SCRIPT_DIR/ip-watch.sh"
+TARGET_SCRIPT="$INSTALL_DIR/ip-watch.sh"
 PLATFORM="$(uname -s)"
 
 if [[ -n "$SCRIPT_DIR" && -f "$SOURCE_SCRIPT" ]]; then
     log "Copying script -> $TARGET_SCRIPT"
     install -m 755 "$SOURCE_SCRIPT" "$TARGET_SCRIPT"
 else
-    log "Downloading ipv6-watch.sh from GitHub -> $TARGET_SCRIPT"
-    curl -fsSL "$REPO_RAW/ipv6-watch.sh" -o "$TARGET_SCRIPT"
+    log "Downloading ip-watch.sh from GitHub -> $TARGET_SCRIPT"
+    curl -fsSL "$REPO_RAW/ip-watch.sh" -o "$TARGET_SCRIPT"
     chmod 755 "$TARGET_SCRIPT"
 fi
 
@@ -225,13 +225,13 @@ install_linux() {
     log "Installing systemd service: $SERVICE_NAME"
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
-Description=IPv6/IPv4 Watch — send webhook on IP change
+Description=IP Watch — send webhook on IP change
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-Environment=IPV6_WATCH_CONFIG=$CONFIG_DIR/config.env
+Environment=IPWATCH_CONFIG=$CONFIG_DIR/config.env
 ExecStart=$TARGET_SCRIPT
 Restart=always
 RestartSec=5
@@ -263,7 +263,7 @@ EOF
 }
 
 install_macos() {
-    local plist="/Library/LaunchDaemons/net.ipv6watch.plist"
+    local plist="/Library/LaunchDaemons/net.ipwatch.plist"
 
     log "Installing launchd daemon -> $plist"
     cat > "$plist" <<EOF
@@ -272,14 +272,14 @@ install_macos() {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>net.ipv6watch</string>
+    <string>net.ipwatch</string>
     <key>ProgramArguments</key>
     <array>
         <string>$TARGET_SCRIPT</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
-        <key>IPV6_WATCH_CONFIG</key>
+        <key>IPWATCH_CONFIG</key>
         <string>$CONFIG_DIR/config.env</string>
     </dict>
     <key>RunAtLoad</key>
@@ -287,32 +287,32 @@ install_macos() {
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/var/log/ipv6-watch.log</string>
+    <string>/var/log/ip-watch.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/ipv6-watch.err</string>
+    <string>/var/log/ip-watch.err</string>
 </dict>
 </plist>
 EOF
 
     chmod 644 "$plist"
-    launchctl bootout system/net.ipv6watch 2>/dev/null || true
+    launchctl bootout system/net.ipwatch 2>/dev/null || true
     launchctl bootstrap system "$plist"
-    launchctl enable system/net.ipv6watch
-    launchctl kickstart -k system/net.ipv6watch
+    launchctl enable system/net.ipwatch
+    launchctl kickstart -k system/net.ipwatch
 
     echo ""
     echo "Installation complete (macOS/launchd)!"
     echo ""
     echo "  Script : $TARGET_SCRIPT"
     echo "  Config : $CONFIG_DIR/config.env"
-    echo "  Daemon : net.ipv6watch"
+    echo "  Daemon : net.ipwatch"
     echo ""
-    echo "Logs: tail -f /var/log/ipv6-watch.log"
+    echo "Logs: tail -f /var/log/ip-watch.log"
     echo ""
     echo "Uninstall:"
-    echo "  sudo launchctl bootout system/net.ipv6watch"
+    echo "  sudo launchctl bootout system/net.ipwatch"
     echo "  sudo rm $plist $TARGET_SCRIPT"
-    echo "  sudo rm -rf $CONFIG_DIR /var/log/ipv6-watch.log /var/log/ipv6-watch.err"
+    echo "  sudo rm -rf $CONFIG_DIR /var/log/ip-watch.log /var/log/ip-watch.err"
 }
 
 case "$PLATFORM" in

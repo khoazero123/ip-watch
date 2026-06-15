@@ -3,19 +3,19 @@
 .SYNOPSIS
     Monitor IPv4/IPv6 changes and send a webhook when IP addresses change.
 .DESCRIPTION
-    Reads configuration from %ProgramData%\IPv6Watch\config.json.
-    Payload format is unified with ipv6-watch.sh (Linux/macOS).
+    Reads configuration from %ProgramData%\IPWatch\config.json.
+    Payload format is unified with ip-watch.sh (Linux/macOS).
 #>
 
 $ErrorActionPreference = "Continue"
 
-$ConfigDir  = Join-Path $env:ProgramData "IPv6Watch"
+$ConfigDir  = Join-Path $env:ProgramData "IPWatch"
 $ConfigFile = Join-Path $ConfigDir "config.json"
 
 function Get-Config {
     if (-not (Test-Path $ConfigFile)) {
         Write-Host "[ERROR] Config not found: $ConfigFile"
-        Write-Host "        Run install-ipv6-watch.ps1 to install."
+        Write-Host "        Run install-ip-watch.ps1 to install."
         exit 1
     }
     try {
@@ -99,7 +99,7 @@ function Build-Payload {
     )
 
     $body = [ordered]@{
-        source     = 'ipv6-watch'
+        source     = 'ip-watch'
         platform   = 'windows'
         event_type = $EventType
         hostname   = $Hostname
@@ -152,7 +152,7 @@ if (-not $apiUrl) {
     exit 1
 }
 
-Write-Log "Starting ipv6-watch (hostname=$hostname, poll=${pollSec}s)"
+Write-Log "Starting ip-watch (hostname=$hostname, poll=${pollSec}s)"
 
 $lastData = ''
 

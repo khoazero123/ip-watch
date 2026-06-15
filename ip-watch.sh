@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# ipv6-watch.sh — Monitor IPv4/IPv6 changes and send webhook notifications (Linux + macOS)
-# Configuration: /etc/ipv6-watch/config.env
+# ip-watch.sh — Monitor IPv4/IPv6 changes and send webhook notifications (Linux + macOS)
+# Configuration: /etc/ip-watch/config.env
 
 set -euo pipefail
 
-CONFIG_FILE="${IPV6_WATCH_CONFIG:-/etc/ipv6-watch/config.env}"
+CONFIG_FILE="${IPWATCH_CONFIG:-/etc/ip-watch/config.env}"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
     echo "[ERROR] Config not found: $CONFIG_FILE" >&2
-    echo "        Run install-ipv6-watch.sh to install." >&2
+    echo "        Run install-ip-watch.sh to install." >&2
     exit 1
 fi
 
@@ -130,7 +130,7 @@ build_payload() {
     ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u '+%Y-%m-%dT%H:%M:%S')"
 
     cat <<EOF
-{"source":"ipv6-watch","platform":"${PLATFORM}","event_type":"${event}","hostname":"${HOSTNAME}","timestamp":"${ts}","interfaces":{${ifjson}}}
+{"source":"ip-watch","platform":"${PLATFORM}","event_type":"${event}","hostname":"${HOSTNAME}","timestamp":"${ts}","interfaces":{${ifjson}}}
 EOF
 }
 
@@ -146,7 +146,7 @@ send_payload() {
 }
 
 # --- Main ---
-log "Starting ipv6-watch (hostname=$HOSTNAME, platform=$PLATFORM, poll=${POLL_INTERVAL}s)"
+log "Starting ip-watch (hostname=$HOSTNAME, platform=$PLATFORM, poll=${POLL_INTERVAL}s)"
 
 while true; do
     payload="$(build_payload init)"
