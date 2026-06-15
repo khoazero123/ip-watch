@@ -8,16 +8,22 @@ Monitor IPv4/IPv6 address changes on Windows, Linux, and macOS, and send webhook
 
 ### Linux / macOS
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | \
-  sudo bash -s -- --webhook-url "https://n8n.example.com/webhook/xxxxxxxx"
-```
-
-Interactive (prompts for webhook URL):
+**Interactive** (prompts for webhook URL):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | sudo bash -s
+curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh \
+  -o /tmp/install-ipv6-watch.sh && sudo bash /tmp/install-ipv6-watch.sh
 ```
+
+**With webhook URL:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh \
+  -o /tmp/install-ipv6-watch.sh \
+  && sudo bash /tmp/install-ipv6-watch.sh --webhook-url "https://n8n.example.com/webhook/xxxxxxxx"
+```
+
+> **Note:** `curl | sudo bash -s` pipes the script into stdin and cannot prompt for input. Use `curl -o && bash` for interactive install, or pass `--webhook-url` when piping.
 
 ### Windows
 

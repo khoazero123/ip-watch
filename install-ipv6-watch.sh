@@ -2,8 +2,11 @@
 # install-ipv6-watch.sh — Install ipv6-watch on Linux (systemd) and macOS (launchd)
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh | \
-#     sudo bash -s -- --webhook-url "https://n8n.example.com/webhook/xxx"
+#   curl -fsSL https://raw.githubusercontent.com/khoazero123/ip-watch/master/install-ipv6-watch.sh \
+#     -o /tmp/install-ipv6-watch.sh && sudo bash /tmp/install-ipv6-watch.sh
+#
+#   curl -fsSL ... -o /tmp/install-ipv6-watch.sh \
+#     && sudo bash /tmp/install-ipv6-watch.sh --webhook-url "https://n8n.example.com/webhook/xxx"
 
 set -euo pipefail
 
@@ -39,12 +42,12 @@ EOF
 log() { echo "==> $*"; }
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
-# When run via "curl | sudo bash", stdin is the pipe — read prompts from /dev/tty
+# When run via "curl | bash", stdin is a pipe — prefer "curl -o && bash" instead.
 tty_print() {
     if [[ -t 1 ]]; then
         echo "$@"
-    elif [[ -w /dev/tty ]]; then
-        echo "$@" >/dev/tty
+    elif [[ -e /dev/tty ]] && { echo "$@" >/dev/tty; } 2>/dev/null; then
+        :
     else
         echo "$@"
     fi
@@ -54,20 +57,43 @@ tty_read() {
     local prompt="$1"
     if [[ -t 0 ]]; then
         read -rp "$prompt" WEBHOOK_URL
-    elif [[ -r /dev/tty ]]; then
-        read -rp "$prompt" WEBHOOK_URL </dev/tty
+    elif [[ -e /dev/tty ]]; then
+        read -rp "$prompt" WEBHOOK_URL </dev/tty 2>/dev/null || return 1
     else
         return 1
     fi
 }
 
+can_use_dev_tty() {
+    ( exec 3<>/dev/tty ) 2>/dev/null
+}
+
 can_prompt_interactively() {
-    [[ -t 0 ]] || [[ -r /dev/tty ]]
+    [[ -t 0 ]] && return 0
+    can_use_dev_tty
+}
+
+pipe_install_hint() {
+    cat >&2 <<EOF
+[ERROR] Cannot prompt for Webhook URL when stdin is a pipe.
+
+Use one of these instead:
+
+  curl -fsSL $REPO_RAW/install-ipv6-watch.sh -o /tmp/install-ipv6-watch.sh \\
+    && sudo bash /tmp/install-ipv6-watch.sh
+
+  curl -fsSL $REPO_RAW/install-ipv6-watch.sh | sudo bash -s -- \\
+    --webhook-url 'https://n8n.example.com/webhook/xxx'
+
+  IPWATCH_WEBHOOK='https://n8n.example.com/webhook/xxx' \\
+    curl -fsSL $REPO_RAW/install-ipv6-watch.sh | sudo -E bash -s
+EOF
 }
 
 prompt_webhook_url() {
     if ! can_prompt_interactively; then
-        die "Webhook URL is required in non-interactive mode. Use: --webhook-url 'https://...'"
+        pipe_install_hint
+        exit 1
     fi
 
     tty_print ""
@@ -77,7 +103,8 @@ prompt_webhook_url() {
 
     while true; do
         if ! tty_read "Webhook URL: "; then
-            die "Webhook URL is required in non-interactive mode. Use: --webhook-url 'https://...'"
+            pipe_install_hint
+            exit 1
         fi
         WEBHOOK_URL="$(echo "$WEBHOOK_URL" | xargs)"
         if [[ -z "$WEBHOOK_URL" ]]; then
