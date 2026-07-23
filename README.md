@@ -125,10 +125,12 @@ Both scripts send the same JSON structure:
 WEBHOOK_URL="https://example.com/webhook/xxxxxxxx"
 IFACES=""
 POLL_INTERVAL=10
+BOOT_DEBOUNCE_SECONDS=10
 ```
 
 - `IFACES`: space-separated interface names, or empty for auto-detect
 - `POLL_INTERVAL`: polling interval in seconds (default: 10)
+- `BOOT_DEBOUNCE_SECONDS`: after startup, batch interface changes for this many seconds before sending one `changed` webhook (default: 10, set to 0 to disable)
 
 After editing config, restart the service:
 

@@ -19,12 +19,15 @@ source "$CONFIG_FILE"
 : "${WEBHOOK_URL:?WEBHOOK_URL is not configured in $CONFIG_FILE}"
 POLL_INTERVAL="${POLL_INTERVAL:-10}"
 INIT_WAIT_IPV6_SECONDS="${INIT_WAIT_IPV6_SECONDS:-30}"
+BOOT_DEBOUNCE_SECONDS="${BOOT_DEBOUNCE_SECONDS:-10}"
 INCLUDE_TAILSCALE="${INCLUDE_TAILSCALE:-true}"
 IFACES="${IFACES:-}"
 
 HOSTNAME="$(hostname -s 2>/dev/null || hostname)"
 PLATFORM="$(uname -s | tr '[:upper:]' '[:lower:]')"
 LAST_INTERFACES=""
+PENDING_INTERFACES=""
+SERVICE_STARTED_AT=0
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -172,6 +175,54 @@ send_payload() {
     return 1
 }
 
+in_boot_debounce_window() {
+    [[ "$BOOT_DEBOUNCE_SECONDS" -gt 0 ]] \
+        && [[ $(($(date +%s) - SERVICE_STARTED_AT)) -lt "$BOOT_DEBOUNCE_SECONDS" ]]
+}
+
+send_changed() {
+    local interfaces="$1"
+    [[ "$interfaces" == "$LAST_INTERFACES" ]] && return 0
+
+    local payload
+    payload="$(build_payload changed "$interfaces")"
+    log "Changed payload: $payload"
+    if send_payload "$payload"; then
+        LAST_INTERFACES="$interfaces"
+        PENDING_INTERFACES=""
+        log "IP change notification sent."
+    fi
+}
+
+handle_interfaces_change() {
+    local interfaces="$1"
+    [[ "$interfaces" == "$LAST_INTERFACES" ]] && return 0
+
+    if in_boot_debounce_window; then
+        PENDING_INTERFACES="$interfaces"
+        log "Boot debounce: queued interface change"
+        return 0
+    fi
+
+    send_changed "$interfaces"
+}
+
+flush_boot_pending() {
+    if [[ -n "$PENDING_INTERFACES" && "$PENDING_INTERFACES" != "$LAST_INTERFACES" ]]; then
+        log "Boot debounce: flushing queued interface change"
+        send_changed "$PENDING_INTERFACES"
+    fi
+    PENDING_INTERFACES=""
+}
+
+start_boot_debounce_flush() {
+    [[ "$BOOT_DEBOUNCE_SECONDS" -le 0 ]] && return 0
+    (
+        sleep "$BOOT_DEBOUNCE_SECONDS"
+        flush_boot_pending
+    ) &
+}
+
 # --- Main ---
 log "Starting ip-watch (hostname=$HOSTNAME, platform=$PLATFORM, poll=${POLL_INTERVAL}s)"
 
@@ -205,32 +256,22 @@ while true; do
     sleep 5
 done
 
+SERVICE_STARTED_AT=$(date +%s)
+start_boot_debounce_flush
+if [[ "$BOOT_DEBOUNCE_SECONDS" -gt 0 ]]; then
+    log "Boot debounce active for ${BOOT_DEBOUNCE_SECONDS}s"
+fi
+
 watch_linux() {
-    ip monitor address 2>/dev/null | while read -r _; do
-        interfaces="$(build_interfaces_json)"
-        if [[ "$interfaces" != "$LAST_INTERFACES" ]]; then
-            payload="$(build_payload changed "$interfaces")"
-            log "Changed payload: $payload"
-            if send_payload "$payload"; then
-                LAST_INTERFACES="$interfaces"
-                log "IP change notification sent."
-            fi
-        fi
-    done
+    while read -r _; do
+        handle_interfaces_change "$(build_interfaces_json)"
+    done < <(ip monitor address 2>/dev/null)
 }
 
 watch_poll() {
     while true; do
         sleep "$POLL_INTERVAL"
-        interfaces="$(build_interfaces_json)"
-        if [[ "$interfaces" != "$LAST_INTERFACES" ]]; then
-            payload="$(build_payload changed "$interfaces")"
-            log "Changed payload: $payload"
-            if send_payload "$payload"; then
-                LAST_INTERFACES="$interfaces"
-                log "IP change notification sent."
-            fi
-        fi
+        handle_interfaces_change "$(build_interfaces_json)"
     done
 }
 
