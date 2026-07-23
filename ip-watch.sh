@@ -18,6 +18,7 @@ source "$CONFIG_FILE"
 
 : "${WEBHOOK_URL:?WEBHOOK_URL is not configured in $CONFIG_FILE}"
 POLL_INTERVAL="${POLL_INTERVAL:-10}"
+INIT_WAIT_IPV6_SECONDS="${INIT_WAIT_IPV6_SECONDS:-30}"
 IFACES="${IFACES:-}"
 
 HOSTNAME="$(hostname -s 2>/dev/null || hostname)"
@@ -149,11 +150,21 @@ send_payload() {
 # --- Main ---
 log "Starting ip-watch (hostname=$HOSTNAME, platform=$PLATFORM, poll=${POLL_INTERVAL}s)"
 
+init_waited=0
+
 while true; do
     payload="$(build_payload init)"
     if echo "$payload" | grep -q '"interfaces":{}'; then
         log "No IP detected, retrying in 5s..."
         sleep 5
+        init_waited=$((init_waited + 5))
+        continue
+    fi
+
+    if ! echo "$payload" | grep -q '"ipv6":' && [[ "$init_waited" -lt "$INIT_WAIT_IPV6_SECONDS" ]]; then
+        log "IPv4 detected but no IPv6 yet, waiting for IPv6 (${init_waited}/${INIT_WAIT_IPV6_SECONDS}s)..."
+        sleep 5
+        init_waited=$((init_waited + 5))
         continue
     fi
 
@@ -195,7 +206,7 @@ watch_poll() {
     done
 }
 
-if [[ "$PLATFORM" == "linux" ]] && ip monitor address >/dev/null 2>&1; then
+if [[ "$PLATFORM" == "linux" ]] && command -v ip >/dev/null 2>&1; then
     log "Watch mode: ip monitor (Linux)"
     watch_linux
 else

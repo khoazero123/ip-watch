@@ -14,6 +14,7 @@ INSTALL_ONE_LINER='sudo bash -c "$(curl -fsSL '"$REPO_RAW"'/install-ip-watch.sh)
 WEBHOOK_URL=""
 IFACES=""
 POLL_INTERVAL=10
+INIT_WAIT_IPV6_SECONDS=30
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/etc/ip-watch"
 SERVICE_NAME="ip-watch"
@@ -30,10 +31,11 @@ With options (append after _):
   sudo bash -c "\$(curl -fsSL $REPO_RAW/install-ip-watch.sh)" _ --webhook-url URL [options]
 
 Options:
-  --webhook-url URL    n8n webhook URL (prompts interactively if omitted)
-  --ifaces IFACES      Space-separated interface names (default: auto-detect)
-  --poll-interval SEC  Polling interval in seconds (default: 10)
-  --help               Show this help message
+  --webhook-url URL        n8n webhook URL (prompts interactively if omitted)
+  --ifaces IFACES          Space-separated interface names (default: auto-detect)
+  --poll-interval SEC      Polling interval in seconds (default: 10)
+  --init-wait-ipv6 SEC     Seconds to wait for IPv6 before initial send (default: 30)
+  --help                   Show this help message
 
 Examples:
   $INSTALL_ONE_LINER
@@ -180,6 +182,7 @@ while [[ $# -gt 0 ]]; do
         --webhook-url)   WEBHOOK_URL="$2"; shift 2 ;;
         --ifaces)        IFACES="$2"; shift 2 ;;
         --poll-interval) POLL_INTERVAL="$2"; shift 2 ;;
+        --init-wait-ipv6) INIT_WAIT_IPV6_SECONDS="$2"; shift 2 ;;
         --help|-h)       usage; exit 0 ;;
         *)               die "Unknown argument: $1 (use --help)" ;;
     esac
@@ -222,6 +225,7 @@ cat > "$CONFIG_DIR/config.env" <<EOF
 WEBHOOK_URL="$WEBHOOK_URL"
 IFACES="$IFACES"
 POLL_INTERVAL=$POLL_INTERVAL
+INIT_WAIT_IPV6_SECONDS=$INIT_WAIT_IPV6_SECONDS
 EOF
 chmod 644 "$CONFIG_DIR/config.env"
 
