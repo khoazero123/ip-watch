@@ -24,7 +24,7 @@ IFACES="${IFACES:-}"
 
 HOSTNAME="$(hostname -s 2>/dev/null || hostname)"
 PLATFORM="$(uname -s | tr '[:upper:]' '[:lower:]')"
-LAST_DATA=""
+LAST_INTERFACES=""
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -124,8 +124,7 @@ get_mac() {
     esac
 }
 
-build_payload() {
-    local event="$1"
+build_interfaces_json() {
     local ifjson=""
     local iface ipv6 ipv4 mac
 
@@ -148,12 +147,17 @@ build_payload() {
     done < <(detect_ifaces)
 
     ifjson="${ifjson%,}"
+    echo "{${ifjson}}"
+}
 
+build_payload() {
+    local event="$1"
+    local interfaces="${2:-$(build_interfaces_json)}"
     local ts
     ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u '+%Y-%m-%dT%H:%M:%S')"
 
     cat <<EOF
-{"source":"ip-watch","platform":"${PLATFORM}","event_type":"${event}","hostname":"${HOSTNAME}","timestamp":"${ts}","interfaces":{${ifjson}}}
+{"source":"ip-watch","platform":"${PLATFORM}","event_type":"${event}","hostname":"${HOSTNAME}","timestamp":"${ts}","interfaces":${interfaces}}
 EOF
 }
 
@@ -174,24 +178,25 @@ log "Starting ip-watch (hostname=$HOSTNAME, platform=$PLATFORM, poll=${POLL_INTE
 init_waited=0
 
 while true; do
-    payload="$(build_payload init)"
-    if echo "$payload" | grep -q '"interfaces":{}'; then
+    interfaces="$(build_interfaces_json)"
+    if [[ "$interfaces" == "{}" ]]; then
         log "No IP detected, retrying in 5s..."
         sleep 5
         init_waited=$((init_waited + 5))
         continue
     fi
 
-    if ! echo "$payload" | grep -q '"ipv6":' && [[ "$init_waited" -lt "$INIT_WAIT_IPV6_SECONDS" ]]; then
+    if ! echo "$interfaces" | grep -q '"ipv6":' && [[ "$init_waited" -lt "$INIT_WAIT_IPV6_SECONDS" ]]; then
         log "IPv4 detected but no IPv6 yet, waiting for IPv6 (${init_waited}/${INIT_WAIT_IPV6_SECONDS}s)..."
         sleep 5
         init_waited=$((init_waited + 5))
         continue
     fi
 
+    payload="$(build_payload init "$interfaces")"
     log "Init payload: $payload"
     if send_payload "$payload"; then
-        LAST_DATA="$payload"
+        LAST_INTERFACES="$interfaces"
         log "Init sent successfully."
         break
     fi
@@ -202,11 +207,12 @@ done
 
 watch_linux() {
     ip monitor address 2>/dev/null | while read -r _; do
-        payload="$(build_payload changed)"
-        if [[ "$payload" != "$LAST_DATA" ]]; then
+        interfaces="$(build_interfaces_json)"
+        if [[ "$interfaces" != "$LAST_INTERFACES" ]]; then
+            payload="$(build_payload changed "$interfaces")"
             log "Changed payload: $payload"
             if send_payload "$payload"; then
-                LAST_DATA="$payload"
+                LAST_INTERFACES="$interfaces"
                 log "IP change notification sent."
             fi
         fi
@@ -216,11 +222,12 @@ watch_linux() {
 watch_poll() {
     while true; do
         sleep "$POLL_INTERVAL"
-        payload="$(build_payload changed)"
-        if [[ "$payload" != "$LAST_DATA" ]]; then
+        interfaces="$(build_interfaces_json)"
+        if [[ "$interfaces" != "$LAST_INTERFACES" ]]; then
+            payload="$(build_payload changed "$interfaces")"
             log "Changed payload: $payload"
             if send_payload "$payload"; then
-                LAST_DATA="$payload"
+                LAST_INTERFACES="$interfaces"
                 log "IP change notification sent."
             fi
         fi
