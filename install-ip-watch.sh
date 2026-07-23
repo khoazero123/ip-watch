@@ -15,6 +15,7 @@ WEBHOOK_URL=""
 IFACES=""
 POLL_INTERVAL=10
 INIT_WAIT_IPV6_SECONDS=30
+INCLUDE_TAILSCALE=true
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/etc/ip-watch"
 SERVICE_NAME="ip-watch"
@@ -35,6 +36,7 @@ Options:
   --ifaces IFACES          Space-separated interface names (default: auto-detect)
   --poll-interval SEC      Polling interval in seconds (default: 10)
   --init-wait-ipv6 SEC     Seconds to wait for IPv6 before initial send (default: 30)
+  --include-tailscale BOOL Include tailscale0 when it has an IP (default: true)
   --help                   Show this help message
 
 Examples:
@@ -183,6 +185,7 @@ while [[ $# -gt 0 ]]; do
         --ifaces)        IFACES="$2"; shift 2 ;;
         --poll-interval) POLL_INTERVAL="$2"; shift 2 ;;
         --init-wait-ipv6) INIT_WAIT_IPV6_SECONDS="$2"; shift 2 ;;
+        --include-tailscale) INCLUDE_TAILSCALE="$2"; shift 2 ;;
         --help|-h)       usage; exit 0 ;;
         *)               die "Unknown argument: $1 (use --help)" ;;
     esac
@@ -226,6 +229,7 @@ WEBHOOK_URL="$WEBHOOK_URL"
 IFACES="$IFACES"
 POLL_INTERVAL=$POLL_INTERVAL
 INIT_WAIT_IPV6_SECONDS=$INIT_WAIT_IPV6_SECONDS
+INCLUDE_TAILSCALE=$INCLUDE_TAILSCALE
 EOF
 chmod 644 "$CONFIG_DIR/config.env"
 

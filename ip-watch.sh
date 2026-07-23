@@ -19,6 +19,7 @@ source "$CONFIG_FILE"
 : "${WEBHOOK_URL:?WEBHOOK_URL is not configured in $CONFIG_FILE}"
 POLL_INTERVAL="${POLL_INTERVAL:-10}"
 INIT_WAIT_IPV6_SECONDS="${INIT_WAIT_IPV6_SECONDS:-30}"
+INCLUDE_TAILSCALE="${INCLUDE_TAILSCALE:-true}"
 IFACES="${IFACES:-}"
 
 HOSTNAME="$(hostname -s 2>/dev/null || hostname)"
@@ -37,7 +38,10 @@ detect_ifaces() {
 
     case "$PLATFORM" in
         linux)
-            ip -o link show up | awk -F': ' '{print $2}' | grep -Ev '^(lo|docker|br-|veth|virbr)' || true
+            {
+                ip -o link show up | awk -F': ' '{print $2}' | grep -Ev '^(lo|docker|br-|veth|virbr)' || true
+                detect_tailscale_iface
+            } | awk 'NF && !seen[$0]++'
             ;;
         darwin)
             networksetup -listallhardwareports 2>/dev/null \
@@ -50,6 +54,23 @@ detect_ifaces() {
         *)
             echo "[ERROR] Unsupported operating system: $PLATFORM" >&2
             exit 1
+            ;;
+    esac
+}
+
+detect_tailscale_iface() {
+    [[ "$INCLUDE_TAILSCALE" =~ ^([Tt][Rr][Uu][Ee]|1|[Yy][Ee][Ss])$ ]] || return 0
+
+    case "$PLATFORM" in
+        linux)
+            if ip addr show dev tailscale0 2>/dev/null | grep -Eq 'inet6? '; then
+                echo "tailscale0"
+            fi
+            ;;
+        darwin)
+            ifconfig -l 2>/dev/null | tr ' ' '\n' | grep '^utun' | while read -r dev; do
+                ifconfig "$dev" 2>/dev/null | grep -q '100\.' && echo "$dev"
+            done
             ;;
     esac
 }
